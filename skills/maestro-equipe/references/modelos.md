@@ -7,7 +7,7 @@ QUADRO Rodada NN (só o Maestro escreve aqui)
 Legenda: nível N0-N4 | status: a fazer > fazendo > revisão > aprovado | revisor sempre de outra família
 
 [RNN-T1] N? · <título>
-  Autor: <produtor> · Revisor: <produtor> · Testes: <produtor ou —>
+  Autor: <produtor> · Modelo/raciocínio: <ex.: Sonnet 5.5 medium> · Revisor: <produtor> · Testes: <produtor ou —>
   Pastas: <pastas> · Migração reservada: <V? ou —> · Risco: <segurança/dinheiro/dado pessoal ou —>
   Status: a fazer
   Pronto quando: <critério verificável>
@@ -26,7 +26,7 @@ Legenda: nível N0-N4 | status: a fazer > fazendo > revisão > aprovado | reviso
 ## Tarefas
 
 ### RNN-T1 · N<0-4> · <título>
-- **Autor:** <produtor> · **Revisor:** <outra família> · **Testes:** <produtor ou —>
+- **Autor:** <produtor> · **Modelo e raciocínio:** <ex.: Haiku 5.5 medium> · **Revisor:** <outra família> · **Testes:** <produtor ou —>
 - **Pastas permitidas:** <pastas> · **Worktree:** <.worktrees/rNN-t1 ou —>
 - **Risco:** <segurança / dinheiro / dado pessoal / —>
 - **Fazer:** <descrição>
@@ -39,20 +39,9 @@ Pergunta, visões, síntese do Maestro, decisão do usuário (vira ADR).
 _(Maestro preenche: status de cada tarefa, ajustes, VISÃO registrada, commits.)_
 ```
 
-## Despacho de tarefa (texto do prompt)
+## Despacho de tarefa e consulta
 
-```
-Rodada NN, tarefa RNN-Tx, nível N?. O projeto fica em <RAIZ> (trabalhe lá, não na pasta .maestri).
-Leia <arquivo da rodada> (seção RNN-Tx) e execute só ela. Pastas permitidas: <pastas>.
-Revisor: <nome>. Valide com <comando>. Ao terminar, reporte com maestri ask "Maestro" no formato de <DOCS>EQUIPE.md.
-```
-
-Consulta (Conselho ou crítica):
-
-```
-Consulta, SOMENTE LEITURA (não crie nem altere arquivos). <contexto curto>. <pergunta e ângulo esperado>.
-Máximo N linhas. Responda com maestri ask "Maestro" "<resposta>" (fora do sandbox se der access denied).
-```
+Os modelos de prompt por família (Gemini em XML, Claude, Codex/GPT), de consulta somente leitura e de revisão estão em `prompts.md`. Todo despacho traz o modelo e o raciocínio esperados.
 
 ## Relatório do produtor
 
@@ -86,7 +75,7 @@ AGENTS.md:
 
 CLAUDE.md:
 ```
-- O Maestro segue a skill maestro-equipe e o MAESTRO.md do projeto. Integre os terminais do Maestri quando ajudam de verdade, sem chamar só por chamar.
+- O Maestro segue a skill maestro-equipe e o MAESTRO.md do projeto: ele comanda (planeja, roteia, despacha, decide, git) e não executa as tarefas. Escolhe o modelo e o raciocínio mais baratos que resolvem e os escreve em cada despacho. Só o Maestro usa Opus no Claude Code; os outros terminais usam Sonnet 5.5 e Haiku 5.5.
 - Commits só no nome do usuário: sem Co-Authored-By e sem rodapé de PR.
 - Tarefas têm nível N0–N4 e o revisor é sempre de outra família de modelo.
 ```

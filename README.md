@@ -6,14 +6,14 @@ Skills para conduzir equipes de agentes de IA no [Maestri](https://www.themaestr
 
 | Skill | O que faz |
 |---|---|
-| [`maestro-equipe`](skills/maestro-equipe/SKILL.md) | Método do Maestro: setup da equipe (presets, papéis, recrutamento), níveis de tarefa N0–N4, roteamento por família de modelo (Claude, Gemini, GPT), revisão cruzada, Conselho de visões, rodadas com quadro, despacho em lote, permissões, cotas e git. |
+| [`maestro-equipe`](skills/maestro-equipe/SKILL.md) | Método do Maestro, que **comanda e não executa**: setup da equipe (presets, papéis, recrutamento), níveis de tarefa N0–N4, escolha do modelo e do raciocínio mais baratos que resolvem cada tarefa, roteamento por família (Claude, Gemini, GPT), prompts de despacho por família, revisão cruzada, Conselho de visões, rodadas com quadro, despacho em lote, permissões, cotas e git. |
 
 Estrutura de uma skill:
 
 ```
 skills/<nome>/
 ├── SKILL.md        # instruções principais (frontmatter com name e description)
-├── references/     # detalhes lidos sob demanda (setup, papéis, modelos)
+├── references/     # detalhes lidos sob demanda (roteamento, prompts, papéis, setup, modelos de documentos)
 └── scripts/        # utilitários (ex.: maestri_batch.py)
 ```
 
@@ -37,7 +37,7 @@ macOS/Linux: `ln -s ~/maestrinho/skills/maestro-equipe ~/.claude/skills/maestro-
 
 ### Outros agentes (Codex, Antigravity)
 
-Os dois também leem skills no formato `SKILL.md`. Crie a mesma ligação na pasta de skills de usuário de cada ferramenta (confira o caminho na documentação da versão instalada; por exemplo, `~/.codex/skills/` no Codex). Se a ferramenta não carregar skills, aponte o agente para o arquivo no prompt ou no papel: "siga `<caminho>/skills/maestro-equipe/SKILL.md`".
+Os dois também leem skills no formato `SKILL.md`. Crie a mesma ligação na pasta de skills de cada ferramenta (confira o caminho na documentação da versão instalada). No Antigravity, o caminho é `.agents/skills/<nome>/SKILL.md` **no workspace** (fonte: `docs/pesquisa/2026-11-18/prompts-gemini.md`); o caminho global de usuário é `[confirmar]`. No Codex, por exemplo, `~/.codex/skills/` `[confirmar]`. Se a ferramenta não carregar skills, aponte o agente para o arquivo no prompt ou no papel: "siga `<caminho>/skills/maestro-equipe/SKILL.md`".
 
 ## Uso
 
