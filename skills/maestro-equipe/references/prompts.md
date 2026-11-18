@@ -4,6 +4,16 @@ O Maestro escolhe o formato pelo **destinatário**, não pelo autor. Em todo des
 
 Relatório: peça curto (até 10–12 linhas) e **sem aspas dentro do texto**; relatório longo ou com aspas pode chegar cortado. Se cortar, peça só o restante.
 
+## 0. O que funcionou nos despachos (vale para qualquer família)
+
+- **Primeira linha:** ID, nível, modo (EDIÇÃO ou SOMENTE LEITURA), **modelo e raciocínio** esperados; depois o caminho absoluto de `<RAIZ>` e a branch ("não troque de branch").
+- **Contexto com os arquivos exatos** a ler e os **fatos já confirmados**, para o autor não redescobrir. Ex.: "os endpoints X e Y foram testados pela Forja; GET /itens não existe". O Maestro só repassa fatos que vieram de relatório de produtor, nunca palpite.
+- **Escopo** permitido **e** proibido, com caminhos. Proibições comuns: "não rode git", "não derrube os containers", "não invente dados", "não mude estrutura, versões nem configs de terceiros".
+- **Validação com comandos exatos** (build, lint, curl, `docker compose config`) e o plano B: "se o Docker estiver desligado, diga no relatório".
+- **Relatório:** formato fixo (TAREFA, STATUS, ARQUIVOS, VALIDAÇÃO, PENDÊNCIAS, VISÃO opcional), **máximo de linhas** e **sem aspas no texto** (aspas cortam a mensagem).
+- **Antigravity:** prompt em XML, com as restrições no fim (seção 1). **Claude:** texto direto, com checklist e "confira antes de terminar" (seção 2).
+- Quando o escopo é verificável por grep, peça o grep no próprio despacho ("rode grep -rn <padrão> <pasta> e cole a contagem"). É o que substitui o revisor em N0/N1.
+
 ## 1. Gemini (Prisma, Lente, Flash)
 
 Fontes: https://ai.google.dev/gemini-api/docs/prompting-strategies · https://ai.google.dev/gemini-api/docs/long-context · https://ai.google.dev/gemini-api/docs/thinking · https://ai.google.dev/gemini-api/docs/function-calling · https://antigravity.google/docs · https://antigravity.google/docs/cli/best-practices · https://antigravity.google/docs/rules-workflows · https://antigravity.google/docs/skills
@@ -139,12 +149,20 @@ SOMENTE LEITURA: nada de editar arquivos.
 
 ## 5. Revisão
 
+Checklist em **itens (a), (b), (c)**: cada um é uma coisa verificável, não "revise tudo". Passe também os **fatos já confirmados** (o que o autor relatou, o que o Maestro viu no `git diff --stat`) para o revisor não refazer a descoberta.
+
 ```
 Revisao de <ID> (autor: <nome, outra familia>). Modo: SOMENTE LEITURA. Projeto: <RAIZ>.
 MODELO/RACIOCINIO esperados: <ex.: Gemini 4 Argon, High>.
-Revise o diff dos arquivos <lista> contra o criterio de pronto: <criterios>. Rode <build/teste>.
+Fatos ja confirmados (nao redescubra): <ex.: o autor reportou build ok; git diff --stat mostra so <arquivos>>.
+Revise o diff dos arquivos <lista> conferindo:
+(a) <item verificavel 1, ex.: o formulario valida e-mail e mostra erro>
+(b) <item 2, ex.: nenhum dado inventado nem segredo no diff>
+(c) <item 3, ex.: <comando de build/teste> passa>
 Se qualquer comando falhar 2x com o mesmo erro, PARE e reporte.
-Devolva "aprovado" ou ate 5 apontamentos (arquivo, problema, correcao sugerida). Sem aspas no texto.
+Devolva "aprovado" ou ate 5 apontamentos (arquivo, trecho, problema, correcao sugerida), um por item. Sem aspas no texto.
 Envie com maestri ask "Maestro" "<relatorio>" (se der access denied, rode so o maestri fora do sandbox).
 SOMENTE LEITURA: nao edite nem crie arquivos.
 ```
+
+Rodada de correção (volta ao **autor**, uma vez só): liste os apontamentos aceitos **numerados**, repita o escopo permitido e peça o relatório no mesmo formato.

@@ -1,6 +1,6 @@
 ---
 name: maestro-equipe
-description: O Maestro SÓ coordena e NUNCA executa trabalho (código, docs, config, pesquisa, leitura de código, testes, builds): todo trabalho vai para os terminais do Maestri. Método de trabalho do Maestro para COMANDAR uma equipe multi-agente de terminais Claude Code, Codex e Antigravity num projeto de software (planeja, roteia, despacha, decide e cuida do git). Cobre setup da equipe, presets e papéis, níveis de tarefa N0–N4, escolha do modelo e do raciocínio certos (economia de cota), roteamento por família (Claude, Gemini, GPT), prompts de despacho, revisão cruzada, Conselho de visões, rodadas com quadro, despacho em lote, permissões, cotas e git. Use sempre que você for (ou for virar) o Maestro de um workspace do Maestri, quando o usuário pedir para montar ou ajustar a equipe, recrutar ou trocar produtores, planejar ou despachar uma rodada, dividir tarefas entre agentes, escolher qual modelo faz o quê, pedir diferentes visões, ou aplicar o fluxo da equipe a outro projeto, mesmo que ele não diga skill nem Maestro. Complementa a skill maestri-manager (comandos); esta ensina como conduzir a equipe.
+description: O Maestro SÓ coordena e NUNCA executa trabalho (código, docs, config, pesquisa, leitura de código, testes, builds): todo trabalho vai para os terminais do Maestri. Método de trabalho do Maestro para COMANDAR uma equipe multi-agente de terminais Claude Code, Codex e Antigravity num projeto de software (planeja, roteia, despacha, decide e cuida do git). Cobre setup da equipe, presets e papéis, níveis de tarefa N0–N4, escolha do modelo e do raciocínio certos (economia de cota), roteamento por família (Claude, Gemini, GPT), prompts de despacho, revisão cruzada, Conselho de visões, rodadas com quadro, despacho em lote, permissões, cotas e git. Use sempre que você for (ou for virar) o Maestro de um workspace do Maestri, quando o usuário pedir para montar ou ajustar a equipe, recrutar ou trocar produtores, planejar ou despachar uma rodada, dividir tarefas entre agentes, escolher qual modelo faz o quê, pedir diferentes visões, ou aplicar o fluxo da equipe a outro projeto, mesmo que ele não diga skill nem Maestro. Inclui o checklist de início de sessão do zero e o ciclo de cada pedido (despacho em background, revisão cruzada, conferência de escopo, git). Complementa a skill maestri-manager (comandos); esta ensina como conduzir a equipe.
 ---
 
 # Maestro de equipe no Maestri
@@ -18,6 +18,33 @@ Para os comandos do Maestri em si (`recruit`, `role`, `preset`, `note`, `band`, 
 5. **Racionalizações a rejeitar:** é só uma linha; é mais rápido eu fazer; só vou dar uma olhada no código; o terminal está ocupado; é config, não é tarefa; o usuário pediu rapidinho. Nenhuma delas libera a execução.
 6. **Sem terminal disponível, ou ele caiu:** recrute ou religue (`maestri recruit --replace`) ou pergunte ao usuário. Nunca faça você mesmo.
 7. **Trabalho trivial** vai para o terminal mais barato (Faísca ou Flash), mesmo assim.
+
+## Início de sessão do zero (antes de qualquer pedido)
+
+Sessão nova, sem histórico: faça este checklist, nesta ordem, antes de agir no primeiro pedido.
+
+1. Releia a REGRA DE OURO acima.
+2. `maestri list`, `maestri role list`, `maestri preset list`.
+3. `maestri check` em cada terminal e leia o **rodapé**: modelo, raciocínio, pasta (`.maestri/roles/<id>` deste projeto?), avisos no banner (ex.: regra inválida no `settings.json`) e pedidos pendentes (confiança de pasta, permissão).
+4. **Os papéis e presets são deste projeto?** Papel que cita outro projeto, ou terminal aberto com `--add-dir` de outra pasta, indica workspace copiado de outro projeto. Não trabalhe assim: siga "Workspace copiado de outro projeto" em `references/setup.md` (a Faísca reescreve os papéis, você os aplica e reabre os terminais).
+5. Leia só os docs de agentes do projeto (`AGENTS.md`, `CLAUDE.md`) e a memória. **Nenhum código**, e **não siga os links** desses docs para README, SETUP ou docs de domínio: se precisar desse conteúdo, peça um resumo a um produtor leve.
+
+## O ciclo de cada pedido
+
+Repita para todo pedido, mesmo pequeno. Casos e detalhes em `references/ciclo.md`.
+
+1. **Entenda o estado só com git e maestri** (`git status --short`, `git log`, `git diff --stat`, `maestri check`). Não leia código: peça resumo a um produtor leve.
+2. **Quebre em tarefas com ID** (`<PREFIXO>-T<n>`): nível, autor, revisor de outra família, modelo e raciocínio. Dependentes em sequência; independentes no mesmo lote.
+3. **Escreva o despacho num JSON no scratchpad** e envie com `scripts/maestri_batch.py ... --linhas N` e `run_in_background: true`.
+4. **Responda ao usuário em poucas linhas e encerre o turno.** Sem polling: a notificação do background e o relatório (`maestri ask "Maestro"`) chegam sozinhos.
+5. **Na notificação, leia só o início da saída** (`head`). Quatro casos: (a) "responded by messaging you directly": aguarde o relatório; (b) tela com pedido de permissão: `maestri check`, aprove uma vez se estiver no escopo (`--raw "\r"`), senão negue ou pergunte; (c) `1 task(s)` ainda rodando no Antigravity: aguarde; (d) tela mostra outra coisa (ex.: comando do usuário no terminal): o despacho se perdeu; confira com `git status` que nada mudou e **reenvie**.
+6. **Com o relatório, confira o escopo:** `git status --short` e `git diff --stat`, sem ler o diff. Arquivo rastreado alterado fora da lista, com a árvore limpa no passo 1: você o reverte com `git restore -- <arquivo>` (git de integração; produtor nunca roda git). Arquivo novo fora da lista: um produtor o remove.
+7. **Despache a revisão a outra família**, somente leitura, com checklist em itens (a), (b), (c) e "aprovado ou até 5 apontamentos com arquivo, trecho e correção". N0/N1 sem revisor de diff: escopo por você e grep pedido no próprio despacho.
+8. **Decida os apontamentos:** aceite, ajuste ou rejeite com motivo. **Uma única rodada de correção** ao autor, itens numerados.
+9. **Integre com git:** commit só no nome do usuário; **push só com autorização explícita para aquele push**. "Não commite" = deixar na working tree.
+10. **Reporte ao usuário:** curto, tabela de quem fez o quê, pendências e o que depende dele. Nunca diga que testou o que não foi testado.
+
+Problema fora do pedido vira **pendência para o usuário decidir**; contorno local também é despachado a um produtor, avisado e sem commit.
 
 ## O que o Maestro faz
 
@@ -99,7 +126,7 @@ Regras de roteamento:
 2. **Planeje** (o Maestro decide; a Faísca escreve o arquivo `docs/rodadas/RNN.md`) (modelo em `references/modelos.md`): cada tarefa com nível, autor, **modelo e raciocínio**, revisor, testes, pastas, risco e critério de pronto. Defina **um dono por rodada** para os arquivos compartilhados (`pom.xml`, `application.yml`, `package.json`, rotas, tema, `docs/contratos/`) e **reserve o número das migrações** no cartão.
 3. **Quadro:** copie a nota `Quadro Modelo` do fichário `Rodadas` para `Quadro RNN`. **Só você escreve no quadro**, a partir dos relatórios.
 4. **Despache** em lote com o script (abaixo), com o prompt no formato da família do destinatário (`references/prompts.md`). Toda tarefa cita o **caminho absoluto do projeto** (os produtores abrem em `.maestri/roles/<id>`). Consultas dizem "SOMENTE LEITURA".
-5. **Acompanhe sem polling em loop.** As respostas chegam como mensagens no seu terminal. Terminal Antigravity que demora a reportar: `maestri check` e aprove o pedido pendente com "permitir uma vez". Se um produtor travar num pedido de permissão, use os critérios abaixo.
+5. **Acompanhe sem polling:** despache em background, encerre o turno e trate a notificação pelos 4 casos de "O ciclo de cada pedido" (passo 5). As respostas chegam como mensagens no seu terminal. Se um produtor travar num pedido de permissão, use os critérios abaixo.
 6. **Mande revisar:** despache o revisor de outra família (para front, inclua conferência visual no portal: `maestri portal create <url> --size 390x844`, depois `portal resize 1280 800` e `portal screenshot`). Leia só o relatório dele e decida: aprovar, devolver ao autor (1 vez) ou escalar.
 7. **Integre:** antes do commit, rode `git status --short` e `git diff --stat` e confira que só os arquivos permitidos foram tocados (sem ler o diff linha a linha); isso pega edição fora de escopo em docs e config que a validação por comando não vê. Depois, um commit por tarefa aprovada, só no nome do usuário. Atualize o quadro (nota) e peça à Faísca para atualizar a rodada e o `STATUS.md`. Feche com um resumo curto: o que ficou pronto, o que falta, bloqueios e a próxima rodada.
 
@@ -144,6 +171,7 @@ O usuário autoriza o Maestro a responder aos pedidos de permissão dos outros t
 - **Commits só no nome do usuário:** sem `Co-Authored-By` e sem rodapé de PR, a menos que ele peça o contrário.
 - Siga as regras do repositório: em repositório compartilhado, não commite em `develop`/`main`, não faça push nem PR sem autorização, e não toque em trabalho alheio não commitado. Docs de agentes podem ficar só locais via `.git/info/exclude`.
 - Antes de reescrever histórico ou forçar push, peça confirmação explícita. Use `--force-with-lease`.
+- Repositório compartilhado, descarte, stash, `--ff-only` e restore de outra branch: `references/ciclo.md`, seção "Git seguro". Decisões que são do usuário (AskUserQuestion) e pendências fora do pedido: mesma referência.
 
 ## Armadilhas conhecidas (Windows + Maestri)
 

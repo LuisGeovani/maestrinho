@@ -92,6 +92,30 @@ Num repositório remoto que já tem commit inicial:
 - despache a um produtor juntar o `.gitignore` do remoto com o local;
 - faça um commit por bloco.
 
+## Workspace copiado de outro projeto (papéis e presets errados)
+
+Sintoma: papéis que citam outro projeto, terminais abertos com `--add-dir` de outra pasta, caminhos antigos no rodapé (`maestri check`). Típico de workspace duplicado a partir de outro projeto. **Confirme com o usuário antes de recriar presets, papéis e terminais.**
+
+1. **Inventário:** `maestri list`, `maestri role list`, `maestri role show "Nome"`, `maestri preset list`, `maestri preset show "Nome"`. Anote o que cita o projeto antigo.
+2. **Presets do projeto:** crie (ou ajuste com `maestri preset set`) presets com `--add-dir "<RAIZ>"` do projeto certo e o nome dele (seção 2). Presets são globais; não apague os do outro projeto.
+3. **Reabra a Faísca com o preset do projeto**, para ela enxergar `<RAIZ>`:
+   ```
+   maestri recruit "Faísca" --preset "<preset do projeto, Haiku>" --replace "Faísca"
+   ```
+   Aprove o "trust this folder" se aparecer. Confira o rodapé com `maestri check "Faísca"`.
+4. **A Faísca reescreve os papéis** a partir de `references/papeis.md` e dos docs do projeto, **em arquivos no scratchpad** (um por papel, trocando projeto, caminho, pastas e especialidades). O Maestro não escreve o conteúdo.
+5. **O Maestro aplica** cada papel com `maestri role write` (substitui o prompt inteiro, no workspace atual):
+   ```
+   maestri role write "Nome do papel" "$(cat "<arquivo-do-papel>")"
+   ```
+   O caminho do arquivo vai **entre aspas** (caminhos do Windows têm espaços). O texto do papel **mantém** as aspas de `maestri ask "Maestro"`; se o CLI recusar, escape só as aspas internas (`\"`) e confira o resultado com `maestri role show "Nome do papel"`.
+6. **Reabra todos** os outros terminais com o preset do projeto, mantendo papel e conexões:
+   ```
+   maestri recruit "Nome" --preset "<preset do projeto>" --replace "Nome"
+   ```
+7. **Antigravity:** aprove o pedido de confiança de pasta de cada terminal: `maestri ask "Nome" --raw "\r"`. Espere o banner virar prompt antes do primeiro `ask`.
+8. **Confira:** `maestri check` em cada um (modelo, raciocínio, pasta `.maestri/roles/<id>` e o banner sem avisos) e rode o teste de ambiente (seção 6).
+
 ## Problemas conhecidos
 
 | Sintoma | Causa | Correção |
