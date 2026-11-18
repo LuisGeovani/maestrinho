@@ -98,7 +98,7 @@ Num repositório remoto que já tem commit inicial:
 | Sintoma | Causa | Correção |
 |---|---|---|
 | Produtor pede permissão para ler cada arquivo do projeto | Abre em `.maestri/roles/<id>`, e o projeto fica fora da área de trabalho | `--add-dir "<RAIZ>"` no preset. No Antigravity, também `"allowNonWorkspaceAccess": true` em `~/.gemini/antigravity-cli/settings.json` |
-| Antigravity: `maestri` dá `access denied (err 5)` ou pede confirmação a cada `maestri ask "Maestro"` | O comando roda no sandbox (integridade Low); no Windows o `maestri` roda **fora** do sandbox, então a regra precisa ser `unsandboxed(...)` | Regra aplicada e funcionando: ver bloco "Regra do Antigravity" logo abaixo da tabela. Só vale para terminais abertos **depois** da mudança (religue com `--replace`). No papel, mantenha só "se der access denied, rode SOMENTE o comando maestri fora do sandbox" (instrução ampla "saia do sandbox" foi bloqueada). `[incerto]` o modo auto ainda pode pedir confirmação: se pedir, aprove com "permitir uma vez" |
+| Antigravity: `maestri` dá `access denied (err 5)` ou pede confirmação a cada `maestri ask "Maestro"` | O comando roda no sandbox (integridade Low) e a permissão `command(...)` do `maestri ask "Maestro"` não está liberada | Regra aplicada e funcionando: ver bloco "Regra do Antigravity" logo abaixo da tabela. Só vale para terminais abertos **depois** da mudança (religue com `--replace`). No papel, mantenha só "se der access denied, rode SOMENTE o comando maestri fora do sandbox" (instrução ampla "saia do sandbox" foi bloqueada). `[incerto]` o modo auto ainda pode pedir confirmação: se pedir, aprove com "permitir uma vez" |
 | Codex: `maestri: only available inside Maestri terminals (MAESTRI_PIPE not set)` | O Codex abre sem as variáveis `MAESTRI_*` | Preset do Codex repassando as variáveis (seção 2). `[shell_environment_policy] inherit = "all"` em `~/.codex/config.toml` ajuda, mas sozinho não basta. Faça backup antes de editar |
 | `maestri: command not found` no terminal do produtor | CLI fora do PATH | Adicionar `%LOCALAPPDATA%\Programs\Maestri\resources\cli` ao PATH do usuário e reabrir o terminal |
 | `maestri ask --batch` dá "Invalid --batch JSON" | Escape quebrado por caminho do Windows ou aspas | Gerar o JSON num arquivo e enviar com `scripts/maestri_batch.py` |
@@ -116,11 +116,12 @@ Em `~/.gemini/antigravity-cli/settings.json`, `permissions.allow` com **exatamen
 
 ```
 "command(regex:(?s)^maestri ask \"Maestro\"(\\s+.*)?$)"
-"unsandboxed(regex:(?s)^maestri ask \"Maestro\"(\\s+.*)?$)"
 ```
 
-Os textos acima já estão escapados para JSON (`\"` e `\\s`): copie-os como estão para dentro do array.
+O texto acima já está escapado para JSON (`\"` e `\\s`): copie-o como está para dentro do array.
 
-- O `maestri` roda fora do sandbox no Windows, por isso precisa do `unsandboxed(...)` além do `command(...)`; o `(?s)` faz o ponto casar quebras de linha, para relatórios multilinha passarem.
+- O `(?s)` faz o ponto casar quebras de linha, para relatórios multilinha passarem.
 - `command(maestri)` genérico libera demais (qualquer subcomando); a regra acima cobre só `maestri ask "Maestro"`.
+- Regra `unsandboxed(...)` não existe: o Antigravity avisa ao abrir que `Invalid unsandboxed permission rules found; they are ignored and grant nothing`.
+- A regra só vale para terminais abertos depois da mudança (religue com `--replace`). Confira o aviso de settings no banner com `maestri check`.
 - Fonte: https://antigravity.google/docs/permissions. `[incerto]` se o modo auto ainda pedir confirmação.
