@@ -36,7 +36,7 @@ Legenda: nível N0-N4 | status: a fazer > fazendo > revisão > aprovado | reviso
 Pergunta, visões, síntese do Maestro, decisão do usuário (vira ADR).
 
 ## Resultado
-_(Maestro preenche: status de cada tarefa, ajustes, VISÃO registrada, commits.)_
+_(Faísca preenche a mando do Maestro: status de cada tarefa, ajustes, VISÃO registrada, commits.)_
 ```
 
 ## Despacho de tarefa e consulta
@@ -75,6 +75,7 @@ AGENTS.md:
 
 CLAUDE.md:
 ```
+- O Maestro só coordena: não edita arquivos, não lê código, não pesquisa, não roda build ou teste e não usa subagentes internos; todo trabalho vai para os terminais do Maestri.
 - O Maestro segue a skill maestro-equipe e o MAESTRO.md do projeto: ele comanda (planeja, roteia, despacha, decide, git) e não executa as tarefas. Escolhe o modelo e o raciocínio mais baratos que resolvem e os escreve em cada despacho. Só o Maestro usa Opus no Claude Code; os outros terminais usam Sonnet 5.5 e Haiku 5.5.
 - Commits só no nome do usuário: sem Co-Authored-By e sem rodapé de PR.
 - Tarefas têm nível N0–N4 e o revisor é sempre de outra família de modelo.

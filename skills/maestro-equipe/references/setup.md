@@ -9,7 +9,6 @@ maestri list            # quem já está conectado (não recrute de novo quem ex
 maestri preset list     # presets disponíveis (exige modo Maestro ligado)
 maestri role list       # papéis do workspace atual
 maestri preset show "Nome"   # ver o comando de um preset
-agy models              # IDs dos modelos do Antigravity (para --model)
 ```
 
 ## 2. Presets
@@ -27,7 +26,7 @@ maestri preset create "Agy Gemini Hydrogen · <proj>" --command 'agy --model gem
 maestri preset create "Agy Gemini Argon · <proj>"    --command 'agy --model gemini-4-argon-high     --add-dir "<RAIZ>"'
 ```
 
-Sob demanda (confirme o ID exato com `agy models` antes): `claude-sonnet-5-5-medium` (transbordo da Forja) e o Gemini 3.8 Flash em Low/Medium. `--effort` valores: `low|medium|high|xhigh|max`; o Claude Code exige versão mínima para Sonnet 5.5 (v2.1.284) e Haiku 5.5 (v2.1.293).
+Sob demanda (um produtor ou o usuário roda `agy models` para confirmar o ID exato antes): `claude-sonnet-5-5-medium` (transbordo da Forja) e o Gemini 3.8 Flash em Low/Medium. `--effort` valores: `low|medium|high|xhigh|max`; o Claude Code exige versão mínima para Sonnet 5.5 (v2.1.284) e Haiku 5.5 (v2.1.293).
 
 Codex (repassa as variáveis do Maestri, que o Codex não herda; **crie só quando a Agulha estiver ativa**):
 
@@ -35,7 +34,7 @@ Codex (repassa as variáveis do Maestri, que o Codex não herda; **crie só quan
 codex -c "shell_environment_policy.set.MAESTRI_PIPE='$env:MAESTRI_PIPE'" -c "shell_environment_policy.set.MAESTRI_TERMINAL_ID='$env:MAESTRI_TERMINAL_ID'" -c "shell_environment_policy.set.MAESTRI_WORKSPACE_ID='$env:MAESTRI_WORKSPACE_ID'" -c "shell_environment_policy.set.MAESTRI_DATA_DIR='$env:MAESTRI_DATA_DIR'" -c "shell_environment_policy.set.MAESTRI_CLI='$env:MAESTRI_CLI'"
 ```
 
-Confira os IDs de modelo com `agy models` antes de criar, rodando você mesmo num terminal normal (dentro do agente ele falha no sandbox). Os IDs mudam com o tempo.
+Confira os IDs de modelo com `agy models` antes de criar, pedindo a um produtor (ex.: Faísca) ou ao usuário que rode num terminal normal (dentro do agente ele falha no sandbox). Os IDs mudam com o tempo.
 
 ## 3. Papéis
 
@@ -85,12 +84,12 @@ Todos precisam responder pelo `maestri`. Quem falhar entra em "Problemas conheci
 
 Se ainda não for repositório e o usuário autorizar:
 - `git init`;
-- `.gitignore` com `node_modules`, `dist`, builds, `.env*` (menos `!.env.example`), backups, `.maestri/` e `.worktrees/`;
+- `.gitignore` (despachado a um produtor) com `node_modules`, `dist`, builds, `.env*` (menos `!.env.example`), backups, `.maestri/` e `.worktrees/`;
 - commits pequenos, só no nome do usuário.
 
 Num repositório remoto que já tem commit inicial:
 - `git fetch` + `git reset origin/main` para basear o histórico local no remoto;
-- junte o `.gitignore` do remoto com o local;
+- despache a um produtor juntar o `.gitignore` do remoto com o local;
 - faça um commit por bloco.
 
 ## Problemas conhecidos
@@ -99,13 +98,13 @@ Num repositório remoto que já tem commit inicial:
 |---|---|---|
 | Produtor pede permissão para ler cada arquivo do projeto | Abre em `.maestri/roles/<id>`, e o projeto fica fora da área de trabalho | `--add-dir "<RAIZ>"` no preset. No Antigravity, também `"allowNonWorkspaceAccess": true` em `~/.gemini/antigravity-cli/settings.json` |
 | Antigravity: `maestri` dá `access denied (err 5)` ou pede confirmação a cada `maestri ask "Maestro"` | O comando roda no sandbox (integridade Low) e a permissão `command(...)` do `maestri ask "Maestro"` não está liberada | Regra aplicada e funcionando: ver bloco "Regra do Antigravity" logo abaixo da tabela. Só vale para terminais abertos **depois** da mudança (religue com `--replace`). No papel, mantenha só "se der access denied, rode SOMENTE o comando maestri fora do sandbox" (instrução ampla "saia do sandbox" foi bloqueada). `[incerto]` o modo auto ainda pode pedir confirmação: se pedir, aprove com "permitir uma vez" |
-| Codex: `maestri: only available inside Maestri terminals (MAESTRI_PIPE not set)` | O Codex abre sem as variáveis `MAESTRI_*` | Preset do Codex repassando as variáveis (seção 2). `[shell_environment_policy] inherit = "all"` em `~/.codex/config.toml` ajuda, mas sozinho não basta. Faça backup antes de editar |
+| Codex: `maestri: only available inside Maestri terminals (MAESTRI_PIPE not set)` | O Codex abre sem as variáveis `MAESTRI_*` | Preset do Codex repassando as variáveis (seção 2). `[shell_environment_policy] inherit = "all"` em `~/.codex/config.toml` ajuda, mas sozinho não basta. Despache a edição a um produtor (escopo fechado, backup antes) |
 | `maestri: command not found` no terminal do produtor | CLI fora do PATH | Adicionar `%LOCALAPPDATA%\Programs\Maestri\resources\cli` ao PATH do usuário e reabrir o terminal |
 | `maestri ask --batch` dá "Invalid --batch JSON" | Escape quebrado por caminho do Windows ou aspas | Gerar o JSON num arquivo e enviar com `scripts/maestri_batch.py` |
 | Mensagem enviada some | O agente ainda estava abrindo | Esperar o prompt aparecer e reenviar (só se não foi recebida) |
-| Arquivo com caractere estranho no início | O PowerShell 5.1 grava UTF-8 com BOM | Remover o BOM (`sed -i '1s/^\xEF\xBB\xBF//' arquivo`) e pedir para gravar com `-Encoding utf8` sem BOM |
+| Arquivo com caractere estranho no início | O PowerShell 5.1 grava UTF-8 com BOM | Despachar a um produtor remover o BOM (com `sed`) e pedir para gravar com `-Encoding utf8` sem BOM |
 | `recruit --dir` não muda a pasta | Com papel definido, o Maestri usa a pasta do papel | Citar o caminho absoluto em toda tarefa |
-| Mudança em configuração global bloqueada pelo modo automático do Claude Code | É uma ação sensível (permissões de outra ferramenta) | Explicar ao usuário o que e por quê; aplicar só com autorização explícita dele. Ex.: `inherit = "all"` e `ignore_default_excludes = true` no `~/.codex/config.toml` repassam também variáveis com TOKEN/KEY; prefira `include_only = ["MAESTRI_*", "PATH", ...]` (testar o que o Codex exige) ou o preset com as variáveis |
+| Mudança em configuração global bloqueada pelo modo automático do Claude Code | É uma ação sensível (permissões de outra ferramenta) | Explicar ao usuário o que e por quê; com autorização explícita dele, despachar a mudança a um produtor (o Maestro não edita). Ex.: `inherit = "all"` e `ignore_default_excludes = true` no `~/.codex/config.toml` repassam também variáveis com TOKEN/KEY; prefira `include_only = ["MAESTRI_*", "PATH", ...]` (testar o que o Codex exige) ou o preset com as variáveis |
 | Relatório longo chega **cortado** | Aspas no texto do `maestri ask "Maestro"` ou relatório extenso | Pedir relatórios curtos (10–12 linhas) e sem aspas dentro do texto; se cortar, pedir só o restante |
 | Terminal volta ao PowerShell depois de atualização da ferramenta (ex.: Codex) | A ferramenta fechou ao atualizar | Religar com `maestri recruit "Nome" --preset P --replace "Nome"` |
 | Agente tenta rodar `/model` ou controlar o computador para ver o próprio modelo | Ele não enxerga o `/model`: no Antigravity o comando não é invocável pelo agente; o Codex tenta usar computer use | Não peça isso. O Maestro lê modelo e cota no rodapé (`maestri check`); proíba computer use no papel |
@@ -125,3 +124,11 @@ O texto acima já está escapado para JSON (`\"` e `\\s`): copie-o como está pa
 - Regra `unsandboxed(...)` não existe: o Antigravity avisa ao abrir que `Invalid unsandboxed permission rules found; they are ignored and grant nothing`.
 - A regra só vale para terminais abertos depois da mudança (religue com `--replace`). Confira o aviso de settings no banner com `maestri check`.
 - Fonte: https://antigravity.google/docs/permissions. `[incerto]` se o modo auto ainda pedir confirmação.
+
+## Edição de configuração de outras ferramentas
+
+`settings.json`, `config.toml` e afins **não são editados pelo Maestro**. Despache a um produtor (ex.: Faísca) com escopo fechado: o arquivo exato, backup antes e o texto a mudar. O Maestro só confere o resultado pelo relatório e pelo banner do terminal (`maestri check`). Mudança em configuração global exige autorização do usuário antes do despacho.
+
+## Reforço por hook `[a validar]`
+
+Ideia: um hook `PreToolUse` nas configurações do Claude Code do terminal do Maestro, bloqueando `Edit`, `Write`, `NotebookEdit`, `WebSearch`, `WebFetch` e `Agent`. Limites: o hook não alcança os produtores Claude Code (eles abrem em `.maestri/roles/<id>`, com outra configuração) e precisa ser testado antes de confiar nele. Não há hook pronto aqui; peça a um produtor para redigi-lo e teste.

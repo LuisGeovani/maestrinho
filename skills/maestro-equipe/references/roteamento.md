@@ -1,6 +1,6 @@
 # Roteamento: tarefa → terminal → modelo → raciocínio → cota
 
-Fonte desta decisão: pesquisa de 2026-11-18 (`docs/pesquisa/2026-11-18/` do repositório da skill). Nomes e preços de modelos mudam: confirme no rodapé do terminal (`maestri check`) e nas URLs abaixo antes de decidir algo caro. `[incerto]` marca o que as fontes não confirmaram.
+Fonte desta decisão: pesquisa de 2026-11-18 (`docs/pesquisa/2026-11-18/` do repositório da skill). Nomes e preços de modelos mudam: confirme no rodapé do terminal (`maestri check`) ou despache a um produtor a conferência nas URLs abaixo antes de decidir algo caro. `[incerto]` marca o que as fontes não confirmaram.
 
 Regra geral: **o modelo e o raciocínio mais baratos que resolvem**. Falhou 2x: sobe o raciocínio; depois o modelo; depois o nível (SKILL.md, "Economia e escalada").
 
@@ -58,7 +58,7 @@ Modelos no Antigravity (runtime lido em 2026-11-18): Gemini 4 Hydrogen (Low, Med
 - Cotas (plano Google AI Pro): Hydrogen e 3.8 Flash resetam a cada 5 h; Argon e Orchestrator têm teto **semanal** separado `[incerto]`. Pool "Claude e GPT" (Opus 5.5, Sonnet 5.5): janela de 5 h sob teto semanal; o Google não publica limite fixo e High/XHigh/Max gastam mais.
 - `[incerto]` Benchmarks (TB 4.1 do Hydrogen 57,0%; DeepSWE do Argon 77,9%; WebDev ~1704/~1681) vêm do relatório da pesquisa, sem conferência independente.
 - `[incerto]` Effort `Max` aparece no `agy --help` para Claude 5.5, mas não no runtime.
-- Dentro do agente, `/model` não é invocável e `agy models` pode falhar no sandbox: rode `agy models` você mesmo, num terminal normal.
+- Dentro do agente, `/model` não é invocável e `agy models` pode falhar no sandbox: peça a um produtor (ex.: Faísca) ou ao usuário que rode `agy models` num terminal normal e traga a saída.
 - Pesquisa de prompts e modos de falha: `prompts.md`.
 
 ## 4. Família OpenAI (Codex)
