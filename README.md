@@ -1,55 +1,65 @@
 # maestrinho
 
-Skills para conduzir equipes de agentes de IA no [Maestri](https://www.themaestri.app/) (canvas com terminais Claude Code, Codex e Antigravity). Não dependem de nenhum projeto específico.
+Skills para conduzir equipes de agentes de IA no [Maestri](https://www.themaestri.app/) (canvas com terminais Claude Code, Antigravity, Codex e OpenCode). Não dependem de nenhum projeto específico.
 
 ## Skills
 
 | Skill | O que faz |
 |---|---|
-| [`maestro-equipe`](skills/maestro-equipe/SKILL.md) | Método do Maestro, que **comanda e não executa**: checklist de início de sessão do zero, ciclo de cada pedido (despacho em background, revisão cruzada, conferência de escopo, git seguro), setup da equipe (presets, papéis, recrutamento), níveis de tarefa N0–N4, escolha do modelo e do raciocínio mais baratos que resolvem cada tarefa, roteamento por família (Claude, Gemini, GPT), prompts de despacho por família, revisão cruzada, Conselho de visões, rodadas com quadro, despacho em lote, permissões, cotas e git. |
-
-Estrutura de uma skill:
+| [`maestro-equipe`](skills/maestro-equipe/SKILL.md) | Método do Maestro, que **comanda e não executa**. Quebra o pedido em tarefas, escolhe para cada uma o terminal, o modelo e o effort pelo catálogo de modelos e pela **cota ao vivo**, monta fluxos em que várias famílias participam (autor, testador e revisor diferentes), despacha com **relatório por arquivo**, revisa cruzado, decide e cuida do git. Inclui o **kit do Maestro**, um hook que impede o Maestro de executar trabalho. |
 
 ```
-skills/<nome>/
-├── SKILL.md        # instruções principais (frontmatter com name e description)
-├── references/     # detalhes lidos sob demanda (ciclo, roteamento, prompts, papéis, setup, modelos de documentos)
-└── scripts/        # utilitários (ex.: maestri_batch.py)
+skills/maestro-equipe/
+├── SKILL.md            regra de ouro, início de sessão, ciclo do pedido, roteamento rápido
+├── maestro/            kit do Maestro: sistema.md, guarda.py (hook), instalar.py, opencode-gratis.json
+├── references/         modelos (catálogo), roteamento, fluxos, comunicacao, prompts, setup, papeis, documentos
+└── scripts/            maestri_batch.py (despacho), cotas.py (cota ao vivo), inventario.py (ambiente)
 ```
+
+`docs/pesquisa/` guarda as fontes do catálogo de modelos e `docs/testes/`, os testes de comunicação feitos no Maestri.
 
 ## Instalação
 
-Clone o repositório uma vez e **ligue** (junction ou symlink) a pasta da skill na pasta de skills de cada agente. Assim, um `git pull` atualiza a skill em todos os agentes.
+Clone uma vez e **ligue** (junction ou symlink) a pasta da skill na pasta de skills de cada ferramenta. Um `git pull` atualiza todas.
 
 ```powershell
 git clone https://github.com/LuisGeovani/maestrinho.git "$HOME\maestrinho"
-```
-
-### Claude Code
-
-Skills de usuário ficam em `~/.claude/skills/`.
-
-```powershell
 New-Item -ItemType Junction -Path "$HOME\.claude\skills\maestro-equipe" -Target "$HOME\maestrinho\skills\maestro-equipe"
 ```
 
 macOS/Linux: `ln -s ~/maestrinho/skills/maestro-equipe ~/.claude/skills/maestro-equipe`
 
-### Outros agentes (Codex, Antigravity)
+| Ferramenta | Pasta de skills do usuário |
+|---|---|
+| Claude Code | `~/.claude/skills/` |
+| Codex e OpenCode | `~/.agents/skills/` (o OpenCode também lê `~/.claude/skills/`) |
+| Antigravity | `~/.gemini/config/skills/` (também lê `~/.gemini/skills/`) |
 
-Os dois também leem skills no formato `SKILL.md`. Crie a mesma ligação na pasta de skills de cada ferramenta (confira o caminho na documentação da versão instalada). No Antigravity, o caminho é `.agents/skills/<nome>/SKILL.md` **no workspace** (fonte: `docs/pesquisa/2026-11-18/prompts-gemini.md`); o caminho global de usuário é `[confirmar]`. No Codex, por exemplo, `~/.codex/skills/` `[confirmar]`. Se a ferramenta não carregar skills, aponte o agente para o arquivo no prompt ou no papel: "siga `<caminho>/skills/maestro-equipe/SKILL.md`".
+O Maestro roda no Claude Code; os produtores não precisam da skill (recebem tudo pelo papel e pelo despacho).
+
+### Kit do Maestro (recomendado)
+
+```
+python ~/maestrinho/skills/maestro-equipe/maestro/instalar.py
+```
+
+Imprime o comando do terminal do Maestro (`claude --model opus --effort medium --append-system-prompt-file … --settings …`) e a linha para cadastrar o preset no Maestri com o modo Maestro ligado. O hook bloqueia edição do projeto, leitura de código, pesquisa, build/testes e subagentes no terminal do Maestro, com a mensagem "despache isto". Teste: `python .../maestro/guarda.py --teste`. Rode o instalador de novo se mover a pasta.
+
+### Requisitos
+
+- Python 3 (só biblioteca padrão) para os scripts e o hook.
+- Maestri com o CLI `maestri` no PATH.
+- As CLIs que a pessoa tiver: `claude`, `agy` (Antigravity), `codex`, `opencode` (v2: `npm i -g @opencode/cli`). Detalhes e problemas conhecidos: `skills/maestro-equipe/references/setup.md`.
 
 ## Uso
 
-Num terminal com o modo Maestro ligado no Maestri, peça algo como "monte a equipe para este projeto", "planeje a próxima rodada" ou "quero diferentes visões sobre esta decisão". A skill carrega sozinha pela descrição e, numa sessão nova, o Maestro refaz o checklist de início e segue o ciclo de `skills/maestro-equipe/references/ciclo.md`.
-
-Despacho em lote, com validação e saída conferida:
+Num terminal com o modo Maestro ligado (de preferência aberto com o preset do kit), peça algo como "monte a equipe para este projeto", "implemente X usando a equipe" ou "quero visões diferentes sobre esta decisão". A skill carrega pela descrição; numa sessão nova o Maestro roda o inventário (`scripts/inventario.py`), confere a equipe e segue o ciclo do `SKILL.md`.
 
 ```
-python <maestrinho>/skills/maestro-equipe/scripts/maestri_batch.py tarefas.json
+python <skill>/scripts/inventario.py                 # o que o ambiente tem e quem é o Maestro
+python <skill>/scripts/cotas.py                      # cota ao vivo e o que gastar primeiro
+python <skill>/scripts/maestri_batch.py despacho.md  # despacho em lote (seções "### Terminal | ID")
 ```
-
-`tarefas.json` é um objeto `{"Agente": "prompt"}` em UTF-8.
 
 ## Atualizar
 
