@@ -21,23 +21,24 @@ Presets são **globais** (valem em todos os workspaces). Não grave o caminho do
 
 | Preset | Comando |
 |---|---|
-| Claude Haiku | `claude --model haiku --effort medium --add-dir ../../..` |
-| Claude Sonnet | `claude --model sonnet --effort medium --add-dir ../../..` |
-| Claude Sonnet High | `claude --model sonnet --effort high --add-dir ../../..` |
+| Haiku | `claude --model haiku --effort medium --add-dir ../../..` |
+| Sonnet | `claude --model sonnet --effort medium --add-dir ../../..` |
+| Sonnet High | `claude --model sonnet --effort high --add-dir ../../..` |
 | Agy Hydrogen | `agy --model gemini-4-hydrogen-high --add-dir ../../..` |
 | Agy Neon | `agy --model gemini-4-neon-high --add-dir ../../..` |
 | Agy Orchestrator Neon | `agy --model gemini-pro-orchestrator-neon --add-dir ../../..` |
 | Agy Opus | `agy --model claude-opus-5-5-high --add-dir ../../..` |
 | Agy Sonnet | `agy --model claude-sonnet-5-5-medium --add-dir ../../..` |
-| Codex Sol | `codex -m gpt-6.2-sol -c model_reasoning_effort=medium` + variáveis do Maestri (seção 6) |
-| OpenCode Grátis | `$env:OPENCODE_CONFIG="<SKILL>/maestro/opencode-gratis.json"; opencode --standalone` (seção 7) |
+| Codex Luna | `codex -m gpt-6-luna -c model_reasoning_effort=high` + variáveis do Maestri (seção 6); com Plus, crie também "Codex Sol" (`gpt-6.2-sol`, medium) |
+| OpenCode Gratis | `$env:OPENCODE_CONFIG="<SKILL>/maestro/opencode-gratis.json"; opencode --standalone` (seção 7) |
 
 ```
-maestri preset create "Claude Haiku" --command "claude --model haiku --effort medium --add-dir ../../.."
+maestri preset create "Haiku" --command "claude --model haiku --effort medium --add-dir ../../.." --quick-start off
 ```
 
 - `../../..` só vale com `--role`. Sem papel, o agente abre na pasta do workspace: use `--dir <RAIZ>` e nenhum `--add-dir`.
-- Presets antigos com caminho de projeto fixo continuam funcionando, mas pare de criar novos; prefira os genéricos.
+- Presets antigos com caminho de projeto fixo continuam funcionando, mas pare de criar novos; prefira os genéricos. Use nomes que não colidam com presets antigos (ex.: "Haiku" em vez de um "Claude Haiku" que já aponta para outro projeto).
+- Presets de produtor podem ficar fora do Quick Start (`--quick-start off`): quem os usa é o Maestro. O Quick Start tem limite; se estiver cheio, o preset novo não aparece lá, mas funciona no `--preset`.
 - Para variar um effort só uma vez, `recruit` aceita `--command` junto com `--preset` (o preset dá o tipo e o ícone): `maestri recruit "Nome" --preset "Claude Code" --command "claude --model haiku --effort low --add-dir ../../.." --role "Papel"`.
 - IDs de modelo mudam: confira no `inventario.py` (para o Antigravity, `agy models`) antes de criar.
 - Nunca `--dangerously-skip-permissions` (agy) nem `--yolo` (codex) num preset de produtor.

@@ -7,9 +7,9 @@ O `maestri list` não mostra o modelo, e no Claude Code o modelo só aparece no 
 ```
 | Terminal | Ferramenta | Modelo · effort | Família | Perfis | Comando/preset |
 |---|---|---|---|---|---|
-| Brasa | Claude Code | Haiku 5.5 · medium | Claude | Batedor | preset "Claude Haiku" |
+| Brasa | Claude Code | Haiku 5.5 · medium | Claude | Batedor | preset "Haiku" |
 | Neblina | Antigravity | Gemini 4 Hydrogen · high | Gemini | Volume | preset "Agy Hydrogen" |
-| Musgo | OpenCode | deepseek-v4.1-flash-free | aberto | Batedor (não sensível) | preset "OpenCode Grátis" |
+| Musgo | OpenCode | deepseek-v4.1-flash-free | aberto | Batedor (não sensível) | preset "OpenCode Gratis" |
 ```
 
 Atualize a linha a cada `recruit --replace` ou troca de modelo.
