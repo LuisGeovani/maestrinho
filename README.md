@@ -53,7 +53,9 @@ Imprime o comando do terminal do Maestro (`claude --model opus --effort medium -
 
 ## Uso
 
-Num terminal com o modo Maestro ligado (de preferência aberto com o preset do kit), peça algo como "monte a equipe para este projeto", "implemente X usando a equipe" ou "quero visões diferentes sobre esta decisão". A skill carrega pela descrição; numa sessão nova o Maestro roda o inventário (`scripts/inventario.py`), confere a equipe e segue o ciclo do `SKILL.md`.
+**Primeira vez? Siga [`docs/primeira-conversa.md`](docs/primeira-conversa.md):** como abrir o Maestro pelo Quick Start, a primeira mensagem pronta para colar, o que esperar e o que fazer se algo der errado.
+
+Depois do setup, num terminal aberto com o preset "Maestro", peça algo como "implemente X", "corrija o bug Y" ou "quero visões diferentes sobre esta decisão". A skill carrega pela descrição; numa sessão nova o Maestro roda o inventário (`scripts/inventario.py`), confere a equipe e segue o ciclo do `SKILL.md`.
 
 ```
 python <skill>/scripts/inventario.py                 # o que o ambiente tem e quem é o Maestro

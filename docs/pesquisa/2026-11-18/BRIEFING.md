@@ -1,3 +1,5 @@
+> **Histórico.** Este documento descreve a versão anterior da skill. A versão atual (reescrita em 2026-11-18) está em `skills/maestro-equipe/`, com fontes em `docs/pesquisa/2026-11-18b/` e testes em `docs/testes/`.
+
 # Briefing do Maestro: reescrita da skill maestro-equipe (2026-11-18)
 
 Fontes desta pasta: `anthropic.md` (Forja), `antigravity-gemini.md` (Prisma), `prompts-gemini.md` (Lente), `openai.md` (Faísca, com conflitos de nome; o que a Agulha confirmou está abaixo).

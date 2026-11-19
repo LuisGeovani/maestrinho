@@ -1,3 +1,5 @@
+> **Histórico.** Este documento descreve a versão anterior da skill. A versão atual (reescrita em 2026-11-18) está em `skills/maestro-equipe/`, com fontes em `docs/pesquisa/2026-11-18b/` e testes em `docs/testes/`.
+
 # Briefing do Maestro: o fluxo aprovado pelo usuário (2026-11-18)
 
 O usuário disse: "teu fluxo de trabalho tá perfeito... esse é o fluxo que eu queria". Medo dele: uma sessão nova, começada do zero, não repetir isso e o Maestro voltar a trabalhar sozinho. Este briefing descreve **exatamente** o ciclo usado nas sessões de 18/11/2026 (projetos Dra e regex), para virar o roteiro operacional da skill.
