@@ -1,6 +1,6 @@
 # Briefing do Maestro: reescrita da skill maestro-equipe (2026-11-18)
 
-Fontes desta pasta: `claude.md` (Forja), `antigravity-gemini.md` (Prisma), `prompts-gemini.md` (Lente), `openai.md` (Faísca, com conflitos de nome; o que a Agulha confirmou está abaixo).
+Fontes desta pasta: `anthropic.md` (Forja), `antigravity-gemini.md` (Prisma), `prompts-gemini.md` (Lente), `openai.md` (Faísca, com conflitos de nome; o que a Agulha confirmou está abaixo).
 
 ## 1. Mudança central: o Maestro comanda, não executa
 
