@@ -1,7 +1,7 @@
 """Despacha tarefas aos produtores do Maestri e resume o retorno de cada um.
 
 Uso:
-    python maestri_batch.py despacho.md [--raiz PASTA] [--maestro NOME] [--mostrar]
+    python maestri_batch.py despacho.md [--raiz PASTA] [--maestro NOME] [--mostrar] [--espera MIN]
     python maestri_batch.py - < despacho.md          (lê do stdin)
 
 Formato do despacho (texto puro, sem JSON e sem escapar nada):
@@ -39,8 +39,20 @@ from pathlib import Path
 LIMITE_JSON = 24000
 RE_SECAO = re.compile(r"^###\s+(.+?)\s*(?:\|\s*([A-Za-z0-9][\w.\-]*))?\s*$")
 RE_PERMISSAO = re.compile(
-    r"(do you want to|allow (this|once|always)|permitir|approve|\(y/n\)|trust (this|the) (folder|files|contents)"
-    r"|requires approval|waiting for (your )?(approval|confirmation)|❯\s*1\.\s*yes)",
+    r"(do you want to"
+    r"|run this command"
+    r"|allow (this|once|always|the (command|tool|action|file))"
+    r"|needs? (your )?permission"
+    r"|permission (required|to (run|use|execute|access|edit|write))"
+    r"|waiting for (your )?(approval|confirmation)"
+    r"|approve (this|the|command|tool)"
+    r"|bypass sandbox"
+    r"|run (this )?outside"
+    r"|requires approval"
+    r"|permitir"
+    r"|\(y/n\)"
+    r"|trust (this|the) (folder|files|contents)"
+    r"|❯\s*1\.\s*yes)",
     re.I,
 )
 RE_INICIANDO = re.compile(r"(still starting|is starting|starting up|ainda (está )?iniciando|not ready)", re.I)
@@ -80,7 +92,7 @@ RE_SIM_DESTACADO = re.compile(r"[>›❯]\s*(\d\.\s*)?(yes|trust|sim|confiar)", 
 
 
 def tela(exe, agente):
-    p = subprocess.run([exe, "check", agente], capture_output=True)
+    p = subprocess.run([exe, "check", agente], capture_output=True, stdin=subprocess.DEVNULL)
     return p.stdout.decode("utf-8", "replace")
 
 
@@ -94,7 +106,7 @@ def esperar_pronto(exe, agente, maximo=90):
             # Pasta de papel criada pelo próprio Maestri dentro do projeto, com "sim/confiar"
             # já destacado: aprova sozinho (Antigravity e Codex perguntam na 1ª vez em cada pasta).
             if aprovados < 2 and RE_PASTA_PAPEL.search(atual) and RE_SIM_DESTACADO.search(atual):
-                subprocess.run([exe, "ask", agente, "--raw", "\\r"], capture_output=True)
+                subprocess.run([exe, "ask", agente, "--raw", "\\r"], capture_output=True, stdin=subprocess.DEVNULL)
                 aprovados += 1
                 print(f"aviso: aprovei a confiança da pasta de papel do Maestri para {agente}")
                 anterior = None
@@ -112,11 +124,63 @@ def relatorio_novo(arq, desde):
     return arq.exists() and arq.stat().st_mtime >= desde - 2
 
 
-def esperar_relatorios(arquivos, desde, minutos):
-    """Espera os arquivos de relatório aparecerem (sondagem leve no disco, sem gastar tokens)."""
+def janela_pedido(texto, linhas=25):
+    """Acha o último pedido de permissão na tela e devolve (janela, linha casada), ou None.
+
+    As linhas de moldura (barra de status, spinner, atalhos) são descartadas antes da busca,
+    senão o trecho mostrado seria só enfeite e o pedido de verdade ficaria de fora.
+    A janela tem até 3 linhas: a casada, uma antes e uma depois."""
+    limpas = [l for l in (texto or "").splitlines() if l.strip() and not RE_MOLDURA.search(l.strip())][-linhas:]
+    for i in range(len(limpas) - 1, -1, -1):
+        if RE_PERMISSAO.search(limpas[i]):
+            return limpas[max(0, i - 1):i + 2], limpas[i]
+    return None
+
+
+def avisar_pedido(exe, agente, ident, avisados):
+    """Imprime o pedido de permissão uma única vez por pedido.
+
+    A deduplicação usa a linha que casou, não a janela inteira: spinner, relógio ou saída
+    nova ao redor mudam a cada sondagem e não podem virar spam. O aviso se rearma quando a
+    tela deixa de ter pedido, para um pedido novo ser anunciado."""
+    achado = janela_pedido(tela(exe, agente))
+    if not achado:
+        avisados.pop(agente, None)
+        return
+    janela, casada = achado
+    if avisados.get(agente) == casada:
+        return
+    avisados[agente] = casada
+    print(f"PENDENTE {agente} {ident}: pedido de permissão", flush=True)
+    for linha in janela:
+        print("   " + linha[:200], flush=True)
+
+
+def esperar_terminar(exe, pendentes, desde, minutos):
+    """Espera, com um prazo global único, os relatórios que ainda faltam.
+
+    O maestri ask --batch volta quando o agente fica quieto, não quando termina: por isso o
+    disco de todos os pendentes é conferido a cada 10 s (quem grava sai da lista) e a tela de
+    cada um que sobra é conferida a cada 30 s, anunciando pedidos de permissão sem repetir e
+    sem aprovar nada. O prazo total é minutos, não minutos por agente.
+    Devolve o conjunto de agentes que continuaram sem relatório quando estourou."""
     limite = time.time() + minutos * 60
-    while time.time() < limite and not all(relatorio_novo(a, desde) for a in arquivos):
+    faltam, avisados, proxima_tela = dict(pendentes), {}, time.time()
+    while faltam:
+        for agente, arq in list(faltam.items()):
+            if relatorio_novo(arq, desde):
+                del faltam[agente]
+        if not faltam:
+            break
+        agora = time.time()
+        if agora >= limite:
+            break
+        if agora >= proxima_tela:
+            proxima_tela = agora + 30
+            for agente, arq in faltam.items():
+                avisar_pedido(exe, agente, arq.stem, avisados)
         time.sleep(10)
+    return set(faltam)
 
 
 def maestri_exe():
@@ -128,7 +192,7 @@ def maestri_exe():
 
 
 def ler_list(exe):
-    p = subprocess.run([exe, "list"], capture_output=True)
+    p = subprocess.run([exe, "list"], capture_output=True, stdin=subprocess.DEVNULL)
     saida = p.stdout.decode("utf-8", "replace")
     if p.returncode != 0:
         print(f"ERRO em maestri list (código {p.returncode}): {p.stderr.decode('utf-8', 'replace').strip()}")
@@ -163,23 +227,60 @@ def ler_despacho(texto):
     return "\n".join(comum).strip(), secoes
 
 
-def enviar(exe, lote, timeout):
-    """Envia um lote {agente: prompt}; devolve {agente: (saida|None, erro|None)}."""
+def enviar_um(exe, agente, prompt, timeout):
+    """Envio individual (sem --batch), usado quando o lote falha; devolve (saida|None, erro|None).
+
+    O maestri ask decodifica \\n e \\t no argumento, então as barras invertidas do prompt (os
+    caminhos do rodapé) vão duplicadas para chegarem literais."""
     try:
         p = subprocess.run(
-            [exe, "ask", "--batch", json.dumps(lote, ensure_ascii=False)],
+            [exe, "ask", agente, prompt.replace("\\", "\\\\")],
             capture_output=True,
+            stdin=subprocess.DEVNULL,
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
-        return {a: (None, f"sem resposta em {timeout // 60} min: rode maestri check \"{a}\"") for a in lote}
+        return None, f"sem resposta em {timeout // 60} min: rode maestri check \"{agente}\""
     saida = p.stdout.decode("utf-8", "replace")
     erro = p.stderr.decode("utf-8", "replace").strip()
-    try:
-        respostas = json.loads(saida)
-        assert isinstance(respostas, list)
-    except (json.JSONDecodeError, AssertionError):
-        return {a: (None, f"falha no envio (código {p.returncode}): {(erro or saida)[:300]}") for a in lote}
+    if p.returncode != 0:
+        return None, f"falha no envio individual (código {p.returncode}): {(erro or saida).strip()[:300]}"
+    return saida, None
+
+
+def enviar(exe, lote, timeout):
+    """Envia um lote {agente: prompt}; devolve {agente: (saida|None, erro|None)}."""
+    def chamar(texto):
+        # stdin=DEVNULL: no modo "-" o maestri.exe herdava o pipe já consumido do despacho e
+        # caía com Access Violation (0xC0000005) antes de enviar qualquer coisa.
+        try:
+            return subprocess.run(
+                [exe, "ask", "--batch", texto],
+                capture_output=True,
+                stdin=subprocess.DEVNULL,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            return None
+
+    sem_resposta = {a: (None, f"sem resposta em {timeout // 60} min: rode maestri check \"{a}\"") for a in lote}
+    payload = json.dumps(lote, ensure_ascii=False)
+    p = chamar(payload)
+    if p is None:
+        return sem_resposta
+    respostas = None
+    if p.returncode == 0:
+        try:
+            respostas = json.loads(p.stdout.decode("utf-8", "replace"))
+            assert isinstance(respostas, list)
+        except (json.JSONDecodeError, AssertionError):
+            respostas = None
+    if respostas is None:
+        # --batch falhou ou voltou sem JSON: manda um por um, que é outro caminho do maestri.
+        motivo = p.stderr.decode("utf-8", "replace").strip() or p.stdout.decode("utf-8", "replace").strip()
+        print(f"aviso: envio em lote falhou (código {p.returncode})"
+              + (f": {motivo[:200]}" if motivo else "") + "; reenviando item a item", flush=True)
+        return {a: enviar_um(exe, a, prompt, timeout) for a, prompt in lote.items()}
     res = {}
     for r in respostas:
         if isinstance(r, dict) and r.get("name") in lote:
@@ -227,9 +328,14 @@ def main() -> int:
     ap.add_argument("--mostrar", action="store_true", help="só mostra os prompts finais, sem enviar")
     ap.add_argument("--linhas", type=int, default=8, help="linhas finais da tela quando não houve ask back")
     ap.add_argument("--timeout", type=int, default=45, help="minutos de espera por lote")
+    ap.add_argument("--espera", type=int, default=30, help="minutos de espera pelo relatório de quem ainda não terminou")
     args = ap.parse_args()
 
-    texto = sys.stdin.read() if args.arquivo == "-" else Path(args.arquivo).read_text(encoding="utf-8-sig")
+    if args.arquivo == "-":
+        # binário: o texto utf-8 do pipe não passa pelo cp1252 do console no Windows
+        texto = sys.stdin.buffer.read().decode("utf-8-sig", "replace")
+    else:
+        texto = Path(args.arquivo).read_text(encoding="utf-8-sig")
     comum, secoes = ler_despacho(texto)
     if not secoes:
         print("ERRO: nenhuma seção '### Agente | ID' no despacho.")
@@ -320,9 +426,25 @@ def main() -> int:
                if out and ids[a] and not relatorio_novo(pasta / f"{ids[a]}.md", inicio) and texto_nao_enviado(out)]
     for a in parados:
         print(f"aviso: o despacho para {a} ficou na caixa de entrada sem envio; mandei Enter e estou esperando o relatório")
-        subprocess.run([exe, "ask", a, "--raw", "\\r"], capture_output=True)
-    if parados:
-        esperar_relatorios([pasta / f"{ids[a]}.md" for a in parados], inicio, args.timeout)
+        subprocess.run([exe, "ask", a, "--raw", "\\r"], capture_output=True, stdin=subprocess.DEVNULL)
+
+    # Quem ainda não gravou relatório pode estar trabalhando em silêncio ou parado num pedido
+    # de permissão: uma espera só, com prazo global de --espera, cobre todos os pendentes.
+    # Com --sem-rodape nenhum relatório foi pedido, então não há o que esperar nem cobrar.
+    sem_relatorio = set()
+    if not args.sem_rodape:
+        pendentes = {}
+        for agente in prompts:
+            _, err = resultados.get(agente, (None, None))
+            if err or not ids[agente] or relatorio_novo(pasta / f"{ids[agente]}.md", inicio):
+                continue
+            pendentes[agente] = pasta / f"{ids[agente]}.md"
+        if pendentes:
+            print(f"aguardando {', '.join(sorted(pendentes))}: até {args.espera} min no total,"
+                  " relatório a cada 10 s, tela a cada 30 s", flush=True)
+            sem_relatorio = esperar_terminar(exe, pendentes, inicio, args.espera)
+            if sem_relatorio:
+                print(f"aviso: sem relatório em {args.espera} min: {', '.join(sorted(sem_relatorio))}", flush=True)
 
     falhou = bool(bloqueios)
     print(f"Maestro: {maestro} | relatórios em {pasta} | {round(time.time() - inicio)} s")
@@ -334,7 +456,6 @@ def main() -> int:
             print(f"== {agente} ({ident}): ERRO {err}")
             falhou = True
             continue
-        texto_out = out or ""
         if ids[agente] and relatorio_novo(arq, inicio):
             conteudo = arq.read_text(encoding="utf-8", errors="replace")[:3000]
             achado, veredito = RE_STATUS.search(conteudo), RE_VEREDITO.search(conteudo)
@@ -343,15 +464,19 @@ def main() -> int:
             print(f"== {agente} ({ident}): {status}{extra} | relatório: {arq}")
             falhou = falhou or status in ("bloqueado", "sem status no arquivo")
             continue
-        if ids[agente] and arq.exists():
+        if not args.sem_rodape and ids[agente] and arq.exists():
             print(f"== {agente} ({ident}): o relatório existente é ANTERIOR a este despacho (use um ID novo por rodada)")
-        cauda = [l for l in texto_out.splitlines() if l.strip()][-args.linhas:]
-        if RE_PERMISSAO.search("\n".join(cauda)):
+        # O retorno do --batch pode ser de minutos atrás: para quem passou pela espera, a tela atual.
+        texto_out = tela(exe, agente) if agente in sem_relatorio else (out or "")
+        achado = janela_pedido(texto_out)
+        if achado:
             print(f"== {agente} ({ident}): PENDENTE, pedido de permissão na tela (maestri check \"{agente}\")")
+            print("\n".join("   " + l[:200] for l in achado[0]))
         else:
+            cauda = [l for l in texto_out.splitlines() if l.strip() and not RE_MOLDURA.search(l.strip())][-args.linhas:]
             print(f"== {agente} ({ident}): terminou sem relatório; últimas linhas:")
-        print("\n".join("   " + l[:200] for l in cauda))
-        falhou = True
+            print("\n".join("   " + l[:200] for l in cauda))
+        falhou = falhou or not args.sem_rodape
     return 1 if falhou else 0
 
 
