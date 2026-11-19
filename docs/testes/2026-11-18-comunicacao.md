@@ -48,3 +48,19 @@ Falha encontrada: o Regente não soube o modelo da Brasa ("modelo não confirmad
 Lição do lado do Maestro real: esperar texto na tela de um terminal falha (a tela rola). Espere pelo **arquivo de relatório** (o `maestri_batch.py` já faz isso) ou pela notificação do background.
 
 Cota depois do ensaio e de todos os testes: ver `cotas.py` no fim da sessão (Claude Pro 5 h subiu principalmente pelo Maestro real em Opus xhigh, que construiu a skill).
+
+## Primeira sessão real com o preset "Maestro" (usuário, 2026-11-18 23:28)
+
+Opus 5.5 medium com o kit, workspace do maestrinho, objetivo "todo mundo diz oi". Formação recrutada pelo próprio Maestro: Brasa (Haiku), Neblina (Agy Hydrogen), Granito (Agy Neon), Cedro (Agy Opus), Musgo (OpenCode grátis), Lua (Codex Luna). Os 6 responderam, cada um no modelo planejado; formação anotada em `.maestri/equipe.md`.
+
+| Achado | Correção |
+|---|---|
+| Os 3 Antigravity pararam na confiança de pasta e o Maestro gastou um ciclo para aprovar e reenviar | `maestri_batch.py` aprova sozinho a confiança quando a pasta é de papel do Maestri e o "sim" está destacado (E11) |
+| O Maestro perguntou se podia configurar o Antigravity, sem conferir que já estava configurado | `scripts/configurar_antigravity.py` (idempotente, backup, `--checar`); o `inventario.py` mostra "Antigravity: config ok / FALTA"; a skill manda aplicar e só avisar |
+| Perguntas simples ao usuário: modelo grátis pode receber código? instalar o plugin oferecido pelo Antigravity? | seção "Quando perguntar ao usuário" no SKILL.md e linha 7 no `sistema.md`: modelos da formação estão aprovados (fora os 4 grátis que treinam com dados), ofertas de plugin são ignoradas, ordem já dada não se reconfirma |
+| Tentativa de `sed -n` com caminho em variável (`$d`) bloqueada pelo kit | esperado (o guarda não resolve variáveis); o Maestro contornou escrevendo o despacho em arquivo |
+
+| # | Teste | Resultado |
+|---|---|---|
+| E11 | terminal Antigravity novo (pasta de papel nova) + despacho imediato, sem aprovar nada à mão | **passou**: "aprovei a confiança da pasta de papel do Maestri", relatório em 24 s, aviso sem confirmação |
+| E12 | `configurar_antigravity.py` em cópia falsa: sem arquivo, com regra antiga, com JSON quebrado | **passou**: cria; troca a regra antiga preservando as outras e as pastas confiáveis, com backup; JSON quebrado não é tocado |

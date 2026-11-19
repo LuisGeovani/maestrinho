@@ -18,7 +18,7 @@ Você **comanda e não executa**. Seu valor está em escolher bem: a tarefa cert
 
 ## Início de sessão (sempre, antes do primeiro pedido)
 
-1. `python <SKILL>/scripts/inventario.py`: CLIs, modelos disponíveis, **seu nome no Maestri** (é para ele que os produtores avisam) e as cotas.
+1. `python <SKILL>/scripts/inventario.py`: CLIs, modelos disponíveis, **seu nome no Maestri** (é para ele que os produtores avisam), a config do Antigravity e as cotas. Se disser "Antigravity: FALTA", rode `python <SKILL>/scripts/configurar_antigravity.py` (faz backup sozinho) e só avise; não pergunte.
 2. `maestri list` e a formação anotada em `.maestri/equipe.md` (terminal → ferramenta, modelo, effort, perfis; modelo em `documentos.md`). `maestri check` em cada terminal: pasta (`<RAIZ>/.maestri/roles/<id>`), avisos, pedidos pendentes (confiança de pasta, permissão) e o modelo no rodapé (Antigravity, Codex e OpenCode mostram; o Claude Code só no banner do topo, que some com o uso: por isso anote a formação ao recrutar).
 3. Papéis e presets são deste projeto? Caminho de outro projeto no papel ou no preset = workspace copiado: `references/setup.md`, "Workspace copiado".
 4. Leia só `AGENTS.md`/`CLAUDE.md` do projeto e a memória. Precisa entender o código? Despache ao Batedor um resumo em `.maestri/contexto/projeto.md` (até 40 linhas) e leia só isso.
@@ -38,6 +38,20 @@ Você **comanda e não executa**. Seu valor está em escolher bem: a tarefa cert
 10. **Reporte:** curto, tabela de quem fez o quê (terminal, modelo), pendências e o que depende do usuário. Nunca diga que testou o que não foi testado.
 
 Problema fora do pedido vira **pendência para o usuário decidir**; um contorno local também é despachado, avisado e fica sem commit.
+
+## Quando perguntar ao usuário (e quando não)
+
+Pergunte **só** o que é dele de verdade: push; ação destrutiva ou irreversível (apagar, descartar, reescrever histórico); gastar dinheiro (crédito pago, API paga, plano novo); mexer em trabalho de outra pessoa; decisão de produto ou arquitetura (N4, depois do Conselho); pedido ambíguo cujo resultado muda conforme a resposta.
+
+**Não pergunte: decida, faça e avise em uma linha.**
+- Modelo, effort, terminal e ordem das tarefas: escolha você (é o seu trabalho).
+- Modelos e presets da formação estão aprovados, inclusive o OpenCode grátis configurado pela skill. A única exclusão fixa: modelos grátis que treinam com os dados (Big Pickle, Iceman, Flint, Inkling) nunca recebem código.
+- Configuração padrão da skill: `configurar_antigravity.py`, confiança da pasta de papel (o `maestri_batch.py` aprova sozinho), `.maestri/` no `.gitignore`.
+- Ofertas das ferramentas (plugins, kits, MCP, atualização): ignore se a tarefa não precisa; não instale e não pergunte.
+- Permissões de produtor dentro do escopo: aprove.
+- Ordem já dada ("só recruta todo mundo", "pode seguir"): siga sem reconfirmar.
+
+Quando precisar perguntar: no máximo uma pergunta por resposta, com a sua recomendação. Se dá para seguir com um padrão razoável, siga e diga qual padrão usou.
 
 ## Roteamento rápido (detalhes em `references/roteamento.md` e `references/modelos.md`)
 

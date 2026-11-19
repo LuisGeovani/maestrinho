@@ -75,6 +75,8 @@ def texto_nao_enviado(saida):
 
 PRONTO = ("for shortcuts", "shift+tab", "Ask anything", "Ask Codex", "Try \"", "Build ·", "Plan ·", "esc to interrupt")
 RE_CONFIANCA = re.compile(r"trust (this|the) (folder|contents|files)|Do you trust|Trust this folder", re.I)
+RE_PASTA_PAPEL = re.compile(r"\.maestri[\\/]+roles[\\/]+[0-9a-f\-]{8,}", re.I)
+RE_SIM_DESTACADO = re.compile(r"[>›❯]\s*(\d\.\s*)?(yes|trust|sim|confiar)", re.I)
 
 
 def tela(exe, agente):
@@ -85,11 +87,20 @@ def tela(exe, agente):
 def esperar_pronto(exe, agente, maximo=90):
     """Despachar para um agente que ainda está abrindo corta ou perde o texto (testado).
     Espera a tela estabilizar com o campo de prompt visível. Devolve None ou o motivo."""
-    limite, anterior = time.time() + maximo, None
+    limite, anterior, aprovados = time.time() + maximo, None, 0
     while time.time() < limite:
         atual = tela(exe, agente)
         if RE_CONFIANCA.search(atual):
-            return "pedido de confiança de pasta na tela: aprove com maestri ask \"%s\" --raw \"\\r\"" % agente
+            # Pasta de papel criada pelo próprio Maestri dentro do projeto, com "sim/confiar"
+            # já destacado: aprova sozinho (Antigravity e Codex perguntam na 1ª vez em cada pasta).
+            if aprovados < 2 and RE_PASTA_PAPEL.search(atual) and RE_SIM_DESTACADO.search(atual):
+                subprocess.run([exe, "ask", agente, "--raw", "\\r"], capture_output=True)
+                aprovados += 1
+                print(f"aviso: aprovei a confiança da pasta de papel do Maestri para {agente}")
+                anterior = None
+                time.sleep(6)
+                continue
+            return "pedido de confiança de pasta fora de .maestri/roles: confira com maestri check \"%s\"" % agente
         if anterior is not None and atual == anterior and any(m in atual for m in PRONTO):
             return None
         anterior = atual

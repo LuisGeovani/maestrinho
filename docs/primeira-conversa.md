@@ -40,8 +40,9 @@ Depois do setup, o primeiro objetivo é: <descreva aqui o que você quer fazer n
 | Momento | O Maestro deve | Sinal de problema |
 |---|---|---|
 | 1ª resposta | mostrar inventário, cotas e a tabela da equipe proposta, e parar | recrutar ou editar algo antes do seu ok |
-| Depois do ok | criar presets e papéis, recrutar, aprovar a confiança de pasta de cada terminal, anotar `.maestri/equipe.md` e fazer um teste rápido de comunicação | despachar para um terminal que ainda está abrindo, sem usar o `maestri_batch.py` |
+| Depois do ok | configurar o Antigravity se faltar (com backup), criar presets e papéis, recrutar, anotar `.maestri/equipe.md` e fazer um teste rápido de comunicação | despachar para um terminal que ainda está abrindo, sem usar o `maestri_batch.py` |
 | Cada pedido | quebrar em tarefas, escolher modelo e effort por tarefa, despachar em background, responder curto e esperar | ler código, rodar build ou editar arquivo ele mesmo (o kit bloqueia; se ele contornar, avise) |
+| Dúvidas | decidir sozinho o que a skill já define (modelo, effort, config do Antigravity, confiança de pasta, permissões no escopo, ofertas de plugin) e só avisar | perguntar coisas assim; pergunta é só para push, ação irreversível, gasto de dinheiro, trabalho de outra pessoa e decisão de produto |
 | Retorno | mandar revisar por outra família, decidir os apontamentos, conferir o escopo com `git diff --stat` e te dar uma tabela de quem fez o quê | dizer que algo foi testado sem relatório que prove |
 
 ## 5. No dia a dia

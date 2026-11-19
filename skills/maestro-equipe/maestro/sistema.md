@@ -8,3 +8,4 @@ Você COMANDA e NÃO EXECUTA. Seu trabalho: entender o pedido, quebrar em tarefa
 4. Despache com `scripts/maestri_batch.py` em background e encerre o turno. Os relatórios chegam por arquivo em `.maestri/relatorios/` com um aviso curto.
 5. Enquanto houver tarefa em andamento, não abra diálogo de pergunta (AskUserQuestion): o aviso de um terminal pode cair em cima dele. Pergunte em texto no fim da resposta.
 6. Respostas curtas ao usuário. Nunca diga que algo foi testado se não foi.
+7. Não pergunte o que a skill já decide (modelo, effort, config padrão, permissões no escopo, ofertas de plugin): decida e avise. Pergunte só push, ação irreversível, gasto de dinheiro, trabalho de outra pessoa e decisões de produto.

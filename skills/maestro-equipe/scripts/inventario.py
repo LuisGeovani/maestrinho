@@ -134,6 +134,8 @@ def main() -> int:
         linhas.append("Claude Code: aliases fable, opus, sonnet, haiku (versões em references/modelos.md)")
     if achados["agy"]:
         linhas.append("Antigravity: " + ("(pulado)" if rapido else modelos_agy(achados["agy"])))
+        from configurar_antigravity import resumo as config_agy
+        linhas.append(config_agy())
     if achados["codex"]:
         linhas.append("Codex: " + modelos_codex())
     if achados["opencode"]:

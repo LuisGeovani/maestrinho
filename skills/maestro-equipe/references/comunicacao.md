@@ -52,7 +52,8 @@ IDs: use um ID novo para cada rodada de correção (`R03-T1-C1`), para não conf
 |---|---|
 | `pronto` / `parcial` (+ `veredito` em revisão) | leia o relatório (só o necessário para decidir) |
 | `bloqueado` | leia o motivo no relatório; produtor que recebeu despacho cortado ou vago reporta bloqueado: reenvie completo |
-| NÃO ENVIADO, pedido de confiança de pasta | `maestri ask "Nome" --raw "\r"`, confira com `check` e rode o despacho de novo só para ele |
+| aviso: aprovei a confiança da pasta de papel | normal na 1ª vez de cada terminal Antigravity/Codex; nada a fazer |
+| NÃO ENVIADO, confiança de pasta fora de `.maestri/roles` | olhe com `maestri check`; aprove só se a pasta for do projeto e rode o despacho de novo só para ele |
 | relatório ANTERIOR a este despacho | o produtor não gravou o novo: `maestri check "Nome"` uma vez; use ID novo por rodada |
 | PENDENTE, pedido de permissão | `maestri check "Nome"`; dentro do escopo, aprove uma vez (`maestri ask "Nome" --raw "\r"` ou a tecla da opção); fora, negue ou pergunte ao usuário |
 | terminou sem relatório (tela mostra outra coisa, ex.: comando do usuário) | o despacho se perdeu: confira com `git status` que nada mudou e reenvie |

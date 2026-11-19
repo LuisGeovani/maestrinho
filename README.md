@@ -13,7 +13,7 @@ skills/maestro-equipe/
 ├── SKILL.md            regra de ouro, início de sessão, ciclo do pedido, roteamento rápido
 ├── maestro/            kit do Maestro: sistema.md, guarda.py (hook), instalar.py, opencode-gratis.json
 ├── references/         modelos (catálogo), roteamento, fluxos, comunicacao, prompts, setup, papeis, documentos
-└── scripts/            maestri_batch.py (despacho), cotas.py (cota ao vivo), inventario.py (ambiente)
+└── scripts/            maestri_batch.py (despacho), cotas.py (cota ao vivo), inventario.py (ambiente), configurar_antigravity.py
 ```
 
 `docs/pesquisa/` guarda as fontes do catálogo de modelos e `docs/testes/`, os testes de comunicação feitos no Maestri.

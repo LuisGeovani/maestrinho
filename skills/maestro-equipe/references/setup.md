@@ -13,7 +13,7 @@ maestri role list                         # papéis do workspace
 
 Comandos de Maestro (`preset`, `role`, `recruit`...) respondendo "This terminal is not the Maestro": o modo Maestro não está ligado **neste** terminal. Peça ao usuário para ligar a opção Maestro no terminal certo do canvas; a mudança pode levar alguns segundos para valer.
 
-Pergunte o que só o usuário sabe: planos (Claude Pro/Max/Ultra, Google AI Free/Pro/Ultra, ChatGPT Free/Plus/Pro, OpenCode Go), se o código pode ir para modelos grátis que treinam com os dados, regras de git do repositório.
+Planos e cotas vêm do `inventario.py` e do `cotas.py`: não pergunte. Pergunte só o que não dá para descobrir e muda o trabalho, como regras de git de um repositório compartilhado (branch protegida, quem faz push). Modelos grátis que treinam com os dados (Big Pickle, Iceman, Flint, Inkling) ficam fora da equipe; os demais presets da skill estão aprovados.
 
 ## 2. Presets: um por modelo, nunca por projeto
 
@@ -61,7 +61,7 @@ maestri recruit "<Codinome>" --preset "<preset por modelo>" --role "<papel>"
 
 Depois de recrutar, para cada terminal:
 1. Espere ~15 s e rode `maestri check "<Codinome>"`. Confira: **modelo, effort, conta/plano e pasta** (`.maestri/roles/<id>` deste projeto). Anote a linha do terminal em `.maestri/equipe.md` (`documentos.md`): no Claude Code o modelo só aparece no banner do topo, que some depois do primeiro trabalho, e o `maestri list` não mostra modelo.
-2. **Confiança de pasta** (Antigravity e Codex perguntam na primeira vez em cada pasta de papel; o Claude Code não perguntou): aprove com `maestri ask "<Codinome>" --raw "\r"` e confira de novo com `check` (o retorno do `--raw` pode mostrar a tela antiga).
+2. **Confiança de pasta** (Antigravity e Codex perguntam na primeira vez em cada pasta de papel; o Claude Code não perguntou): o `maestri_batch.py` aprova sozinho quando a pasta é de papel do Maestri (`.maestri/roles/<id>`) e o "sim" já está destacado; não pergunte ao usuário. Na mão: `maestri ask "<Codinome>" --raw "\r"` e confira com `check` (o retorno do `--raw` pode mostrar a tela antiga). Pasta fora de `.maestri/roles`: não aprove sem olhar.
 3. Avisos no banner (regra inválida, MCP sem autenticação, cota baixa): anote; os de cota viram decisão de roteamento.
 4. Só então o primeiro despacho. Despachar para quem ainda está abrindo perde o Enter ou corta o texto (testado); o `maestri_batch.py` já espera a tela ficar pronta, mas um `maestri ask` direto não espera.
 
@@ -71,7 +71,8 @@ Não crie band sem o usuário pedir, e não conecte produtores entre si: tudo pa
 
 ## 5. Antigravity (`agy`)
 
-- **Regra para o aviso de relatório** em `~/.gemini/antigravity-cli/settings.json` (faça backup antes; config global, só com ok do usuário). Em `permissions.allow`, exatamente:
+- **Configure com o script, sem perguntar:** `python <SKILL>/scripts/configurar_antigravity.py` (idempotente, faz backup, só muda o que falta; `--checar` só confere; o `inventario.py` já mostra o estado). Ele garante a regra abaixo e o `allowNonWorkspaceAccess`, e remove a regra antiga do nome fixo. É uma regra estreita (só o aviso curto), por isso faz parte do setup padrão; avise o usuário em uma linha.
+- **Regra para o aviso de relatório** em `~/.gemini/antigravity-cli/settings.json`, `permissions.allow`, exatamente:
 
   ```
   "command(regex:^maestri ask \"[^\"]+\" \"[^\"$`;&|<>]*\"$)"

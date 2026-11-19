@@ -58,7 +58,7 @@ OpenCode v2 (`opencode`): modelo no formato `provider/model#variante`; na interf
 
 | Modelo | Bom em | Cuidado |
 |---|---|---|
-| **Grátis do Zen** (por tempo limitado): `opencode/deepseek-v4.1-flash-free` (TB 4.1 38,5% na versão paga), `mimo-v2.6-flash-free`, `nemotron-3.5-lightning-free`, `nemotron-3.5-super-vl-free` (visão), `longcat-2.5-free`, `hy4-flash-free`, `beam-free`, `tidepool-alpha-free` | Batedor de custo zero: exploração, resumo, triagem, testes e docs simples, checagens; um "terceiro olhar" de outra família | fracos em agente longo; confirme a política de dados antes de mandar código sensível |
+| **Grátis do Zen** (por tempo limitado): `opencode/deepseek-v4.1-flash-free` (TB 4.1 38,5% na versão paga), `mimo-v2.6-flash-free`, `nemotron-3.5-lightning-free`, `nemotron-3.5-super-vl-free` (visão), `longcat-2.5-free`, `hy4-flash-free`, `beam-free`, `tidepool-alpha-free` | Batedor de custo zero: exploração, resumo, triagem, testes e docs simples, checagens; um "terceiro olhar" de outra família | fracos em agente longo; o preset da skill (`deepseek-v4.1-flash-free`) está aprovado para o projeto: use sem perguntar |
 | `opencode/big-pickle`, `iceman-free`, `flint-40b-free`, `inkling-2-small-free` | o mesmo | **podem usar os dados para treino**: nunca com código ou dado sensível |
 | Pagos (Zen ou OpenCode Go, se a pessoa assinar): Kimi K3.1 Pro (TB 59,7%), GLM-5.3 (41%), DeepSeek V4 Pro, Qwen | implementação média como quarta família | custo por token |
 
