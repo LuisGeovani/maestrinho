@@ -36,6 +36,7 @@ Presets são **globais** (valem em todos os workspaces). Não grave o caminho do
 maestri preset create "Haiku" --command "claude --model haiku --effort medium --add-dir ../../.." --quick-start off
 ```
 
+- **Produtor Claude: padrão = Agy Sonnet / Agy Opus** (Antigravity, pool "Claude and GPT"). Os presets Sonnet / Sonnet High (Claude Code, cota Pro dividida com o Maestro) são **reserva**: só quando o pool Claude do Antigravity esgotar (`cotas.py` com 5h ou semanal ≥ 100%) ou a tarefa precisar de algo que só o Claude Code faz fora do sandbox do Antigravity (rede local/SSH sem autorização, git/gh, escrita fora do workspace); volte ao Antigravity quando a cota voltar. Ao propor a formação, ponha Agy Sonnet/Agy Opus nos produtores Claude. Haiku segue como está.
 - `../../..` só vale com `--role`. Sem papel, o agente abre na pasta do workspace: use `--dir <RAIZ>` e nenhum `--add-dir`.
 - Presets antigos com caminho de projeto fixo continuam funcionando, mas pare de criar novos; prefira os genéricos. Use nomes que não colidam com presets antigos (ex.: "Haiku" em vez de um "Claude Haiku" que já aponta para outro projeto).
 - Presets de produtor podem ficar fora do Quick Start (`--quick-start off`): quem os usa é o Maestro. O Quick Start tem limite; se estiver cheio, o preset novo não aparece lá, mas funciona no `--preset`.

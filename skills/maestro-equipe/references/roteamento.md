@@ -26,16 +26,16 @@ A equipe é montada com o que o inventário achar (`scripts/inventario.py`). Cad
 |---|---|---|
 | **Batedor** | mapear arquivos e estado, resumir código para o Maestro, busca, inventário, rodar testes/lint/build, docs curtas, N0, consolidar pesquisas | Haiku 5.5 medium → OpenCode grátis (`deepseek-v4.1-flash-free`) → GPT Luna high → Hydrogen low |
 | **Volume** | código N1–N2 bem especificado, UI em lotes por página ou fluxo, escrever testes, pesquisa web | Hydrogen high → Sonnet 5.5 medium no Antigravity → Sonnet 5.5 medium no Claude Code → GPT 6.2 Sol medium |
-| **Crítico** | N3: concorrência, banco, segurança, lógica de dinheiro, refatoração grande | Neon high (Orchestrator Neon se for multi-arquivo) → Opus 5.5 high no Antigravity → Sonnet 5.5 high → GPT 6.2 Astra high |
+| **Crítico** | N3: concorrência, banco, segurança, lógica de dinheiro, refatoração grande | Neon high (Orchestrator Neon se for multi-arquivo) → Opus 5.5 high no Antigravity → Sonnet 5.5 high no Antigravity → Sonnet 5.5 high no Claude Code → GPT 6.2 Astra high |
 | **Arquiteto** | N4, especificação executável, contratos, ADR, desempate | Conselho com uma voz por família: Neon xhigh + Opus 5.5 high (Antigravity) + GPT 6.2 Astra high (se houver) + Fable 5.2 high (se o plano tiver) |
-| **Revisor** | revisão de diff N2+, sempre de família **diferente** do autor | autor Gemini → Sonnet 5.5 (medium; high em N3) ou Opus no Antigravity ou GPT 6.2 Sol; autor Claude → Neon high; autor GPT ou aberto → Neon ou Sonnet |
-| **QA visual** | conferir UI pelo portal (390×844 e 1280), prints, PDFs, gráficos | Neon high → Sonnet 5.5 medium (olho de design) |
+| **Revisor** | revisão de diff N2+, sempre de família **diferente** do autor | autor Gemini → Sonnet 5.5 (medium; high em N3) ou Opus no Antigravity → os mesmos no Claude Code → GPT 6.2 Sol; autor Claude → Neon high; autor GPT ou aberto → Neon ou Sonnet (Antigravity) |
+| **QA visual** | conferir UI pelo portal (390×844 e 1280), prints, PDFs, gráficos | Neon high → Sonnet 5.5 medium no Antigravity (olho de design) → Sonnet 5.5 medium no Claude Code |
 
 Regras de ouro do roteamento:
 - **Nível alto nunca em modelo leve.** Batedor não faz lógica N2+.
 - **Famílias diferentes se conferem:** autor ≠ revisor em N2+; em N3, testes por uma terceira família quando houver. Dois terminais do mesmo modelo são dois votos iguais, não duas visões.
 - **Volume vai para o pool abundante:** Hydrogen e OpenCode grátis antes de gastar Claude Pro ou Codex.
-- **Claude Pro é dividido com o Maestro:** mande para o Claude Code só o que precisa dele; Opus e Sonnet também existem no Antigravity, em outro pool.
+- **Claude nos produtores: PRIMEIRO o Antigravity, SÓ DEPOIS o Claude Code.** Sonnet e Opus rodam nos presets Agy Sonnet / Agy Opus (pool "Claude and GPT"); o Claude Code (cota Pro dividida com o Maestro) é reserva. Exceções: pool Claude do Antigravity esgotado (`cotas.py` com 5h ou semanal ≥ 100%) ou tarefa que precisa de algo que só o Claude Code faz fora do sandbox do Antigravity (rede local/SSH sem autorização, git/gh, escrita fora do workspace); nesses casos use Claude Code e volte ao Antigravity quando a cota voltar. Haiku segue como está.
 - **GPT entra quando há cota.** No plano Free, só Luna para checagens curtas; com Plus, Sol revisa e Astra opina em N4.
 - **Dado sensível** (código fechado de cliente, segredos, dados pessoais) nunca vai para modelo grátis que treina com os dados (Big Pickle, Iceman, Flint, Inkling).
 
@@ -59,7 +59,8 @@ Regras de ouro do roteamento:
 
 - **Gaste primeiro** o pool com mais folga e reset mais próximo: cota que renova logo e sobra é cota perdida.
 - **≥ 80%** num pool: só tarefas que só aquele modelo faz bem; o resto vai para a alternativa da tabela.
-- **Claude Pro ≥ 70% na janela de 5 h:** pare de mandar trabalho para terminais Claude Code; use Opus/Sonnet no Antigravity. O Maestro precisa da folga para coordenar.
+- **Claude Pro ≥ 70% na janela de 5 h:** pare de mandar trabalho para terminais Claude Code; use Opus/Sonnet no Antigravity (que já é a 1ª escolha para Claude). O Maestro precisa da folga para coordenar.
+- **Pool "Claude and GPT" do Antigravity ≥ 100% (5 h ou semanal):** é a exceção que libera o Claude Code para Sonnet/Opus; volte ao Antigravity quando a cota voltar.
 - Cota é recurso de equipe: nunca mova uma tarefa para um modelo **mais fraco** do que ela exige só para poupar cota; mova para outro pool equivalente.
 
 ## 5. Escalada quando falha

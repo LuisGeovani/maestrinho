@@ -4,7 +4,9 @@ Atualizado em **2026-11-18**. Fontes e números completos: `docs/pesquisa/2026-1
 
 Nomes e IDs mudam rápido. Antes de criar presets, confira com `python <skill>/scripts/inventario.py` (lista o que o ambiente tem de verdade). Seção final: como atualizar este catálogo.
 
-## Claude (Claude Code; Opus e Sonnet também no Antigravity, pool "Claude and GPT")
+## Claude (Opus e Sonnet: PRIMEIRO no Antigravity, pool "Claude and GPT"; SÓ DEPOIS no Claude Code)
+
+Para produtores Sonnet/Opus use os presets Agy Sonnet / Agy Opus; o Claude Code (cota Pro dividida com o Maestro) é reserva. Exceções: pool Claude do Antigravity esgotado (`cotas.py` com 5h ou semanal ≥ 100%) ou tarefa que precisa de algo que só o Claude Code faz fora do sandbox do Antigravity (rede local/SSH sem autorização, git/gh, escrita fora do workspace); nesses casos use Claude Code e volte ao Antigravity quando a cota voltar. Haiku segue como está.
 
 | Modelo | Bom em | Evite | Effort |
 |---|---|---|---|
@@ -30,7 +32,7 @@ IDs = `<modelo>-<effort>` (ex.: `gemini-4-neon-high`). Effort maior gasta mais c
 | **Gemini 4 Argon** | engenharia longa (AA 50); usa o teto semanal separado do Argon: bom para não gastar o pool Gemini principal | superado pelo Neon em qualidade `[incerto]` | medium; high no difícil |
 | **Gemini 3.8 Flash** | texto, triagem; único modelo em todos os planos | agente de terminal (TB 4.1 18%), fabrica 5x mais que o Hydrogen | low/medium |
 | **Gemini 4 Carbon** | o mais forte para tarefas longas | só Ultra/Enterprise (aparece "Unavailable" no Pro); lento | medium |
-| **Claude Opus 5.5 / Sonnet 5.5 no agy** | os mesmos modelos da Anthropic **sem gastar o Claude Pro** (pool "Claude and GPT") | — | até high |
+| **Claude Opus 5.5 / Sonnet 5.5 no agy** | os mesmos modelos da Anthropic **sem gastar o Claude Pro** (pool "Claude and GPT"); **1ª escolha** para produtor Claude, antes do Claude Code | — | até high |
 | **GPT-OSS 120B** | — | sendo removido ("Notice", 18/11/2026) | não rotear |
 
 - Prompt: XML ou Markdown, contexto primeiro, restrições e formato no fim; não pedir "pense passo a passo" (o thinking é nativo); escopo fechado (ver `prompts.md`).
