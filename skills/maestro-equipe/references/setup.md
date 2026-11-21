@@ -25,6 +25,7 @@ Presets são **globais** (valem em todos os workspaces). Não grave o caminho do
 | Sonnet | `claude --model sonnet --effort medium --add-dir ../../..` |
 | Sonnet High | `claude --model sonnet --effort high --add-dir ../../..` |
 | Agy Hydrogen | `agy --model gemini-4-hydrogen-high --add-dir ../../..` |
+| Agy Argon | `agy --model gemini-4-argon-high --add-dir ../../..` |
 | Agy Neon | `agy --model gemini-4-neon-high --add-dir ../../..` |
 | Agy Orchestrator Neon | `agy --model gemini-pro-orchestrator-neon --add-dir ../../..` |
 | Agy Opus | `agy --model claude-opus-5-5-high --add-dir ../../..` |

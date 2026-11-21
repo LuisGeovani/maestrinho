@@ -59,11 +59,13 @@ Quando precisar perguntar: no máximo uma pergunta por resposta, com a sua recom
 |---|---|---|
 | Batedor | mapear, resumir código, buscar, rodar testes/lint, docs curtas, N0 | Haiku 5.5 medium → OpenCode grátis → GPT Luna high → Hydrogen low |
 | Volume | código N1–N2 especificado, UI por página/fluxo, testes, pesquisa web | Hydrogen high → Sonnet 5.5 medium (Antigravity) → Sonnet (Claude Code) → GPT 6.2 Sol |
-| Crítico | N3: concorrência, banco, segurança, dinheiro, refatoração grande | Neon high (Orchestrator Neon se multi-arquivo) → Opus 5.5 high (Antigravity) → Sonnet high (Antigravity) → Sonnet high (Claude Code) → GPT 6.2 Astra |
+| Volume de cuidado | tarefa longa, redação ou engenharia que pede mais cuidado que o Hydrogen; segunda voz Gemini com o Neon ocupado ou o pool Gemini apertado | Argon medium (teto semanal próprio) → Sonnet 5.5 medium (Antigravity) → Neon medium → Hydrogen xhigh |
+| Crítico | N3: concorrência, banco, segurança, dinheiro, refatoração grande | Neon high (Orchestrator Neon se multi-arquivo) → Argon high `[incerto]` → Opus 5.5 high (Antigravity) → Sonnet high (Antigravity) → Sonnet high (Claude Code) → GPT 6.2 Astra |
 | Arquiteto | N4, especificação, contratos, ADR | Conselho, uma voz por família: Neon xhigh + Opus high (Antigravity) + Astra (se houver) |
-| Revisor | diff N2+, família ≠ autor | autor Gemini → Sonnet/Opus (Antigravity) → Sonnet/Opus (Claude Code) → Sol; autor Claude → Neon; autor GPT/aberto → Neon ou Sonnet (Antigravity) |
+| Revisor | diff N2+, família ≠ autor | autor Gemini → Sonnet/Opus (Antigravity) → Sonnet/Opus (Claude Code) → Sol; autor Claude → Neon → Argon `[incerto]`; autor GPT/aberto → Neon ou Sonnet (Antigravity) |
 | QA visual | UI no portal (390×844 e 1280), prints, PDFs | Neon → Sonnet (Antigravity) → Sonnet (Claude Code) |
 
+- **Duas tríplices, leve → médio → forte:** Claude = Haiku 5.5 → Sonnet 5.5 → Opus 5.5; Gemini = Hydrogen → Argon → Neon. Suba na tríplice da mesma família antes de trocar de família; autor e revisor continuam de famílias diferentes. Detalhes em `modelos.md`.
 - **Nível alto nunca em modelo leve; família diferente confere** (dois terminais do mesmo modelo são dois votos iguais).
 - **Claude nos produtores (Sonnet, Opus): PRIMEIRO o Antigravity** (presets Agy Sonnet / Agy Opus, pool "Claude and GPT"), **SÓ DEPOIS o Claude Code** (cota Pro dividida com você). Exceções: o pool Claude do Antigravity esgotado (`cotas.py` mostra 5h ou semanal ≥ 100%) ou a tarefa precisar de algo que só o Claude Code faz fora do sandbox do Antigravity (rede local/SSH sem autorização, git/gh, escrita fora do workspace). Nesses casos use Claude Code e volte ao Antigravity quando a cota voltar. Haiku segue como está.
 - **Volume no pool abundante** (Gemini, OpenCode grátis).

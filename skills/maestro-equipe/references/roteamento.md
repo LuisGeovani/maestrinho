@@ -26,14 +26,16 @@ A equipe é montada com o que o inventário achar (`scripts/inventario.py`). Cad
 |---|---|---|
 | **Batedor** | mapear arquivos e estado, resumir código para o Maestro, busca, inventário, rodar testes/lint/build, docs curtas, N0, consolidar pesquisas | Haiku 5.5 medium → OpenCode grátis (`deepseek-v4.1-flash-free`) → GPT Luna high → Hydrogen low |
 | **Volume** | código N1–N2 bem especificado, UI em lotes por página ou fluxo, escrever testes, pesquisa web | Hydrogen high → Sonnet 5.5 medium no Antigravity → Sonnet 5.5 medium no Claude Code → GPT 6.2 Sol medium |
-| **Crítico** | N3: concorrência, banco, segurança, lógica de dinheiro, refatoração grande | Neon high (Orchestrator Neon se for multi-arquivo) → Opus 5.5 high no Antigravity → Sonnet 5.5 high no Antigravity → Sonnet 5.5 high no Claude Code → GPT 6.2 Astra high |
+| **Volume de cuidado** | tarefa longa, redação ou engenharia que pede mais cuidado que o Hydrogen; segunda voz Gemini quando o Neon está ocupado ou o pool Gemini principal está apertado (Argon tem teto semanal próprio) | Argon medium (high se difícil) → Sonnet 5.5 medium no Antigravity → Neon medium → Hydrogen xhigh |
+| **Crítico** | N3: concorrência, banco, segurança, lógica de dinheiro, refatoração grande | Neon high (Orchestrator Neon se for multi-arquivo) → Argon high `[incerto]` → Opus 5.5 high no Antigravity → Sonnet 5.5 high no Antigravity → Sonnet 5.5 high no Claude Code → GPT 6.2 Astra high |
 | **Arquiteto** | N4, especificação executável, contratos, ADR, desempate | Conselho com uma voz por família: Neon xhigh + Opus 5.5 high (Antigravity) + GPT 6.2 Astra high (se houver) + Fable 5.2 high (se o plano tiver) |
-| **Revisor** | revisão de diff N2+, sempre de família **diferente** do autor | autor Gemini → Sonnet 5.5 (medium; high em N3) ou Opus no Antigravity → os mesmos no Claude Code → GPT 6.2 Sol; autor Claude → Neon high; autor GPT ou aberto → Neon ou Sonnet (Antigravity) |
+| **Revisor** | revisão de diff N2+, sempre de família **diferente** do autor | autor Gemini → Sonnet 5.5 (medium; high em N3) ou Opus no Antigravity → os mesmos no Claude Code → GPT 6.2 Sol; autor Claude → Neon high → Argon high `[incerto]`; autor GPT ou aberto → Neon ou Sonnet (Antigravity) |
 | **QA visual** | conferir UI pelo portal (390×844 e 1280), prints, PDFs, gráficos | Neon high → Sonnet 5.5 medium no Antigravity (olho de design) → Sonnet 5.5 medium no Claude Code |
 
 Regras de ouro do roteamento:
 - **Nível alto nunca em modelo leve.** Batedor não faz lógica N2+.
 - **Famílias diferentes se conferem:** autor ≠ revisor em N2+; em N3, testes por uma terceira família quando houver. Dois terminais do mesmo modelo são dois votos iguais, não duas visões.
+- **Tríplices por família** (`modelos.md`): Claude Haiku → Sonnet → Opus; Gemini Hydrogen → Argon → Neon. Cada degrau tem seu custo e sua cota: leve para volume e checagem, médio para produção cuidadosa, forte para N3/N4 e revisão.
 - **Volume vai para o pool abundante:** Hydrogen e OpenCode grátis antes de gastar Claude Pro ou Codex.
 - **Claude nos produtores: PRIMEIRO o Antigravity, SÓ DEPOIS o Claude Code.** Sonnet e Opus rodam nos presets Agy Sonnet / Agy Opus (pool "Claude and GPT"); o Claude Code (cota Pro dividida com o Maestro) é reserva. Exceções: pool Claude do Antigravity esgotado (`cotas.py` com 5h ou semanal ≥ 100%) ou tarefa que precisa de algo que só o Claude Code faz fora do sandbox do Antigravity (rede local/SSH sem autorização, git/gh, escrita fora do workspace); nesses casos use Claude Code e volte ao Antigravity quando a cota voltar. Haiku segue como está.
 - **GPT entra quando há cota.** No plano Free, só Luna para checagens curtas; com Plus, Sol revisa e Astra opina em N4.
@@ -45,8 +47,8 @@ Regras de ouro do roteamento:
 |---|---|---|---|---|
 | N0 | Haiku low | Hydrogen low | Luna medium | grátis |
 | N1 | Haiku medium; Sonnet low | Hydrogen medium | Luna high; Sol low | grátis |
-| N2 | Sonnet medium | Hydrogen high; Neon medium | Sol medium | pago, se houver |
-| N3 | Sonnet high; Opus high | Neon high | Sol high; Astra high | — |
+| N2 | Sonnet medium | Hydrogen high; Argon medium; Neon medium | Sol medium | pago, se houver |
+| N3 | Sonnet high; Opus high | Neon high; Argon high `[incerto]` | Sol high; Astra high | — |
 | N4 | Opus high; Fable high | Neon xhigh | Astra high/xhigh | — |
 
 - Escreva **sempre** o modelo e o effort esperados no cartão e na 1ª linha do despacho: os padrões divergem entre ferramentas.
@@ -67,7 +69,7 @@ Regras de ouro do roteamento:
 
 Falhou 2x (o produtor reportou bloqueado ou a revisão reprovou duas vezes):
 1. Suba o **effort** no mesmo modelo (Haiku medium → high; Hydrogen high → xhigh).
-2. Suba o **modelo** dentro do perfil (Haiku → Sonnet; Hydrogen → Neon; Sonnet → Opus no Antigravity).
+2. Suba o **modelo** dentro da tríplice da mesma família, antes de trocar de família (Haiku → Sonnet → Opus no Antigravity; Hydrogen → Argon → Neon). Autor e revisor continuam de famílias diferentes.
 3. Suba o **nível** da tarefa e reavalie o escopo (talvez falte especificação: despache ao Arquiteto).
 
 ## 6. Economia de tokens (custo por tarefa concluída, não por chamada)

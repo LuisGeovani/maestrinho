@@ -4,6 +4,16 @@ Atualizado em **2026-11-18**. Fontes e números completos: `docs/pesquisa/2026-1
 
 Nomes e IDs mudam rápido. Antes de criar presets, confira com `python <skill>/scripts/inventario.py` (lista o que o ambiente tem de verdade). Seção final: como atualizar este catálogo.
 
+## Tríplices: leve → médio → forte (suba na mesma família antes de trocar de família)
+
+| Família | Leve | Médio | Forte |
+|---|---|---|---|
+| Claude | **Haiku 5.5** ($0,10/$0,50): Batedor, extração, checagens | **Sonnet 5.5** ($2/$10): produção do dia a dia, revisão de outra família, redação | **Opus 5.5** ($4/$20): N3/N4, decisão difícil |
+| Gemini | **Hydrogen** ($1,50/$7,50): código e texto bem especificados, lote | **Argon**: tarefa longa, redação/engenharia que pede mais cuidado que o Hydrogen | **Neon** ($3/$15): N3, revisão, QA visual, multimodal |
+
+- Cota: Haiku/Sonnet/Opus no Antigravity = pool "Claude and GPT" (Claude Code só como reserva); Hydrogen e Neon = pool "Gemini Models" (5 h + semanal); **Argon = teto semanal próprio no Pro, não gasta o pool Gemini principal**. Custo relativo: Haiku < Sonnet < Opus; Hydrogen < Neon, com o Argon no meio `[incerto]` (preço de API do Argon não confirmado).
+- Qualidade relativa Argon × Neon (e Argon × Sonnet) **não medida** `[incerto]`: o catálogo lista o Neon acima; o Argon está em teste no projeto Mais Gestão. Em N3+ sem medida, prefira o Neon; o Argon é alternativa.
+
 ## Claude (Opus e Sonnet: PRIMEIRO no Antigravity, pool "Claude and GPT"; SÓ DEPOIS no Claude Code)
 
 Para produtores Sonnet/Opus use os presets Agy Sonnet / Agy Opus; o Claude Code (cota Pro dividida com o Maestro) é reserva. Exceções: pool Claude do Antigravity esgotado (`cotas.py` com 5h ou semanal ≥ 100%) ou tarefa que precisa de algo que só o Claude Code faz fora do sandbox do Antigravity (rede local/SSH sem autorização, git/gh, escrita fora do workspace); nesses casos use Claude Code e volte ao Antigravity quando a cota voltar. Haiku segue como está.
@@ -19,7 +29,7 @@ Para produtores Sonnet/Opus use os presets Agy Sonnet / Agy Opus; o Claude Code 
 - Anthropic mediu: Opus orquestrando Sonnet ≈ 1/3 mais barato com a mesma nota; Fable orquestrando, 19% mais caro sem ganho; trabalhadores Haiku −32% de custo e −4 pts. Por isso o Maestro roda Opus e o Haiku fica no perfil Batedor.
 - Plano: Pro e Max dividem 5 h + semanal entre o chat e o Claude Code (e com o Maestro). Max = 5x Pro; Ultra (ex-Max 20x) = 10x Pro por semana.
 
-## Gemini (Antigravity `agy`; pool "Gemini Models" 5 h + semanal; Argon tem teto semanal próprio no Pro)
+## Gemini (Antigravity `agy`; pool "Gemini Models" 5 h + semanal; Argon tem teto semanal próprio no Pro; tríplice Hydrogen → Argon → Neon)
 
 IDs = `<modelo>-<effort>` (ex.: `gemini-4-neon-high`). Effort maior gasta mais cota.
 
@@ -29,7 +39,7 @@ IDs = `<modelo>-<effort>` (ex.: `gemini-4-neon-high`). Effort maior gasta mais c
 | **Gemini 4 Hydrogen** ($1,50/$7,50) | o "burro de carga": volume de código bem especificado, UI em lotes por página/fluxo, edições cirúrgicas (até 81% menos overreach), pesquisa web; TB 4.1 57%; ~2,5x mais rápido que o 3.8 Flash | tarefa vaga, sem escopo fechado | high; medium em código interativo e protótipo de UI; low em trivial |
 | **Orchestrator (Neon)** `gemini-pro-orchestrator-neon` | features, bugs, refatoração e debug **multi-arquivo**: Neon planeja só-leitura e revisa, Hydrogen executa (na versão Carbon: −24% de cota) | design de sistemas, concorrência, migrações (use o modelo puro) | fixo |
 | **Orchestrator (Argon)** `gemini-pro-orchestrator-g1-pro` | o mesmo, com Argon planejando | — | fixo |
-| **Gemini 4 Argon** | engenharia longa (AA 50); usa o teto semanal separado do Argon: bom para não gastar o pool Gemini principal | superado pelo Neon em qualidade `[incerto]` | medium; high no difícil |
+| **Gemini 4 Argon** (30/09/2026) | **modelo principal de nível médio** da tríplice Gemini: tarefa longa e de redação/engenharia que pede mais cuidado que o Hydrogen, refatoração ampla, segunda voz Gemini com o Neon ocupado; AA 50, DeepSWE 77,9%, multimodal denso (LVBench 91,7%); **teto semanal próprio** (não gasta o pool Gemini principal) | N3 de risco alto e revisão decisiva (o Neon supera o Argon em qualidade `[incerto]`); volume trivial (gasta o teto à toa) | medium; high no difícil; low só em trivial |
 | **Gemini 3.8 Flash** | texto, triagem; único modelo em todos os planos | agente de terminal (TB 4.1 18%), fabrica 5x mais que o Hydrogen | low/medium |
 | **Gemini 4 Carbon** | o mais forte para tarefas longas | só Ultra/Enterprise (aparece "Unavailable" no Pro); lento | medium |
 | **Claude Opus 5.5 / Sonnet 5.5 no agy** | os mesmos modelos da Anthropic **sem gastar o Claude Pro** (pool "Claude and GPT"); **1ª escolha** para produtor Claude, antes do Claude Code | — | até high |
