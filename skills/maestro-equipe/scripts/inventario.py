@@ -9,7 +9,6 @@ Só leitura: roda comandos de listagem e lê caches locais.
 Também avisa, uma linha por preset, dos presets com --add-dir/--dir de caminho absoluto
 (precisa do terminal Maestro: usa `maestri preset list` e `maestri preset show`).
 """
-import json
 import os
 import re
 import shutil
@@ -18,7 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from cotas import ler_cotas, resumo_linhas  # noqa: E402
+from cotas import ler_cotas, modelos_codex_cache, resumo_linhas  # noqa: E402
 
 CLIS = {
     "claude": "Claude Code",
@@ -26,6 +25,20 @@ CLIS = {
     "codex": "Codex",
     "opencode": "OpenCode",
     "maestri": "Maestri",
+}
+PRESETS_CODEX = {
+    "Codex Luna": ("gpt-6-luna", "high"),
+    "Codex Terra": ("gpt-6.1-terra", "medium"),
+    "Codex Sol": ("gpt-6.2-sol", "medium"),
+    "Codex Astra": ("gpt-6.2-astra", "high"),
+}
+PRESETS_SUGERIDOS = {**PRESETS_CODEX, "Agy Flash": ("gemini-3.8-flash-low", None)}
+ENV_MAESTRI_CODEX = {"MAESTRI_CLI", "MAESTRI_DATA_DIR", "MAESTRI_PIPE", "MAESTRI_TERMINAL_ID", "MAESTRI_WORKSPACE_ID"}
+MEDIDORES_GEMINI_CONFIRMADOS = {
+    "gemini-4-hydrogen": "gemini-models",
+    "gemini-4-neon": "gemini-models",
+    "gemini-pro-orchestrator-neon": "gemini-models",
+    "gemini-pro-orchestrator-g1-pro": "gemini-4-argon",
 }
 
 
@@ -72,14 +85,15 @@ def modelos_agy(exe):
     return ", ".join(agrupar_por_effort(ids)) or "nenhum"
 
 
-def modelos_codex():
+def modelos_codex(modelos=None):
     casa = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
     cache = casa / "models_cache.json"
     if not cache.exists():
         return "sem cache (abra o codex uma vez)"
-    dados = json.loads(cache.read_text(encoding="utf-8"))
+    if modelos is None:
+        modelos = modelos_codex_cache()
     partes = []
-    for m in dados.get("models", []):
+    for m in modelos:
         niveis = [n.get("effort") for n in m.get("supported_reasoning_levels", []) if n.get("effort")]
         faixa = f"{niveis[0]}..{niveis[-1]}" if niveis else ""
         partes.append(f"{m.get('slug')}[{faixa}]")
@@ -91,7 +105,21 @@ def modelos_codex():
         me = re.search(r'^model_reasoning_effort\s*=\s*"([^"]+)"', texto, re.M)
         if mm:
             padrao = f" | padrão: {mm.group(1)} {me.group(1) if me else ''}".rstrip()
-    return ", ".join(partes) + padrao
+    return (", ".join(partes) or "cache vazio ou ilegível") + padrao
+
+
+def degraus_codex(modelos):
+    por_id = {m.get("slug"): m for m in modelos}
+    partes = []
+    for nome, (modelo, _) in PRESETS_CODEX.items():
+        m = por_id.get(modelo)
+        if m is None or m.get("visibility") == "hide":
+            estado = "não listado no cache"
+        else:
+            niveis = [n["effort"] for n in m.get("supported_reasoning_levels", []) if n.get("effort")]
+            estado = f"listado no cache{', effort ' + '/'.join(niveis) if niveis else ''}"
+        partes.append(f"{nome.removeprefix('Codex ')} ({modelo}, {estado})")
+    return "GPT no Codex: " + " · ".join(partes)
 
 
 def modelos_opencode(exe):
@@ -124,6 +152,14 @@ def nome_do_maestro(exe):
 
 FLAG_DIR = re.compile(r"(?<![\w-])--(add-dir|dir)(?:\s+|=)(\"[^\"]*\"|'[^']*'|\S+)")
 CAMINHO_FIXO = re.compile(r"^(?:[A-Za-z]:[\\/]|[\\/]|~)")
+COMANDO_PRESET = re.compile(r"^[ \t]*(?:command|comando)[ \t]*:[ \t]*(.*)$", re.I | re.M)
+CLI_PRESET = re.compile(r"""(?<![\w.-])(codex|claude|agy|opencode)(?:\.(?:exe|cmd|bat|ps1))?(?=[\s"';&]|$)""", re.I)
+MODELO_PRESET = re.compile(r"""(?:^|\s)(?:--model|-m)(?:\s+|=)["']?([^\s"';]+)""", re.I)
+TITULO_PRESETS = re.compile(
+    r"^(?:available|no)\s|^(?:(?:agent|recruit|saved|configured|quick[- ]start|maestri)\s+)*presets\b"
+    r"|^(?:available\s+)?(?:cli\s+)?accounts?\b",
+    re.I,
+)
 
 
 def nomes_de_presets(texto):
@@ -131,7 +167,7 @@ def nomes_de_presets(texto):
     nomes = []
     for linha in texto.splitlines():
         l = linha.strip().lstrip("-*•> ").strip()
-        if not l or l.endswith(":") and "\"" not in l:
+        if not l or l.endswith(":") or TITULO_PRESETS.match(l):
             continue
         m = re.match(r'"([^"]+)"', l) or re.match(r"(.+?)(?:\s*[:—–]\s|\s+-\s|\s{2,}|$)", l)
         if m and m.group(1).strip():
@@ -149,28 +185,86 @@ def caminhos_fixos(comando):
     return achados
 
 
-def presets_com_caminho_fixo(exe):
-    """Linhas do relatório: um preset suspeito por linha, ou uma linha só dizendo que está tudo bem."""
+def medidor_gemini(modelo, medidores_agy):
+    """Prioriza o medidor dedicado e usa vínculos confirmados quando disponíveis."""
+    base = re.sub(r"-(?:low|medium|high|xhigh|max)$", "", modelo)
+    por_nome = {"-".join(nome.casefold().split()): nome for nome in medidores_agy}
+    if base != "gemini-models" and base in por_nome:
+        return por_nome[base]
+    return por_nome.get(MEDIDORES_GEMINI_CONFIRMADOS.get(base), "medidor desconhecido")
+
+
+def ferramenta_e_pool(comando, plano_claude, medidores_agy=()):
+    achado = CLI_PRESET.search(comando)
+    if not achado:
+        return "ferramenta não identificada", "pool não identificado"
+    cli = achado.group(1).lower()
+    modelo = MODELO_PRESET.search(comando, achado.end())
+    modelo = modelo.group(1).lower() if modelo else ""
+    if cli == "codex":
+        pool = "Codex"
+    elif cli == "claude":
+        pool = f"Claude {plano_claude}" if plano_claude else "Claude Code (plano não identificado)"
+    elif cli == "opencode":
+        gratis = modelo.endswith("-free") or "big-pickle" in modelo or "opencode-gratis" in comando.casefold()
+        pool = "grátis" if gratis else "pool não identificado"
+    elif modelo.startswith("gemini-"):
+        pool = medidor_gemini(modelo, medidores_agy)
+    elif modelo.startswith(("claude-", "gpt-")):
+        pool = "Claude and GPT models"
+    else:
+        pool = "pool não identificado"
+    return CLIS[cli], pool
+
+
+def comando_preset(detalhes):
+    if not detalhes:
+        return ""
+    m = COMANDO_PRESET.search(detalhes)
+    if m:
+        return m.group(1)
+    return detalhes.strip() if len(detalhes.strip().splitlines()) == 1 else ""
+
+
+def presets_com_caminho_fixo(exe, plano_claude="", medidores_agy=()):
+    """Relata caminhos fixos e os vínculos entre presets, CLIs e medidores."""
     saida, erro = rodar([exe, "preset", "list"], timeout=20)
     texto = saida or ""
     if not texto.strip() or "not the Maestro" in texto or "not the Maestro" in (erro or ""):
         return ["Presets: não verificado (só o terminal Maestro lê os presets)"]
-    suspeitos, vistos = [], set()
-    for nome in nomes_de_presets(texto)[:40]:
-        if nome in vistos:
+    suspeitos, vinculos = [], []
+    nomes = list(dict.fromkeys(nomes_de_presets(texto)))
+    for nome in nomes:
+        detalhes, _ = rodar([exe, "preset", "show", nome], timeout=20)
+        if detalhes is None:
             continue
-        vistos.add(nome)
-        comando, _ = rodar([exe, "preset", "show", nome], timeout=20)
-        for flag, valor in caminhos_fixos(comando or ""):
+        comando = comando_preset(detalhes)
+        for flag, valor in caminhos_fixos(detalhes):
             suspeitos.append(f'  "{nome}": {flag} {valor}')
-    if not suspeitos:
-        return ["Presets: nenhum com caminho fixo"]
-    return ["Presets com caminho fixo (use o genérico: references/setup.md §2):"] + suspeitos
+        ferramenta, pool = ferramenta_e_pool(comando, plano_claude, medidores_agy)
+        linha = f'  "{nome}" → {ferramenta} → {pool}'
+        if ferramenta == "Codex":
+            citadas = set(re.findall(r"\bMAESTRI_[A-Z0-9_]+\b", comando.upper()))
+            faltam = sorted(ENV_MAESTRI_CODEX - citadas)
+            linha += f" | aviso: faltam {', '.join(faltam)}" if faltam else " | MAESTRI_* presentes"
+        vinculos.append(linha)
+    linhas = (["Presets com caminho fixo (use o genérico: references/setup.md §2):"] + suspeitos
+              if suspeitos else ["Presets: nenhum com caminho fixo"])
+    if vinculos:
+        linhas += ["Preset → ferramenta → pool"] + vinculos
+    presentes = {nome.casefold() for nome in nomes}
+    for nome, (modelo, effort) in PRESETS_SUGERIDOS.items():
+        if nome.casefold() not in presentes:
+            ferramenta, pool = ferramenta_e_pool(f"{'codex' if effort else 'agy'} --model {modelo}", plano_claude, medidores_agy)
+            linhas.append(f"Preset sugerido: {nome} → {ferramenta} → {pool} ({modelo}{', ' + effort if effort else ''})")
+    return linhas
 
 
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     rapido = "--rapido" in sys.argv
+    pools, avisos = ler_cotas()
+    medidores_agy = {p["medidor"] for p in pools if p["provedor"].casefold() == "antigravity"}
     linhas = ["== CLIs"]
     achados = {}
     for cmd, rotulo in CLIS.items():
@@ -182,10 +276,15 @@ def main() -> int:
         linhas.append("Claude Code: aliases fable, opus, sonnet, haiku (versões em references/modelos.md)")
     if achados["agy"]:
         linhas.append("Antigravity: " + ("(pulado)" if rapido else modelos_agy(achados["agy"])))
+        flash = medidor_gemini("gemini-3.8-flash", medidores_agy)
+        consulta = " · consulta de disponibilidade pulada (--rapido)" if rapido else ""
+        linhas.append(f"Gemini 3.8 Flash (gemini-3.8-flash): {flash}{consulta}")
         from configurar_antigravity import resumo as config_agy
         linhas.append(config_agy())
     if achados["codex"]:
-        linhas.append("Codex: " + modelos_codex())
+        cache = modelos_codex_cache()
+        linhas.append("Codex: " + modelos_codex(cache))
+        linhas.append(degraus_codex(cache))
     if achados["opencode"]:
         linhas.append("OpenCode: " + ("(pulado)" if rapido else modelos_opencode(achados["opencode"])))
     if achados["maestri"]:
@@ -193,7 +292,8 @@ def main() -> int:
         linhas.append("== Maestri")
         linhas.append(f"Você (nome para o ask back): {nome or '?'}")
         linhas.append("Conectados: " + (", ".join(agentes) if agentes else "nenhum"))
-        linhas += presets_com_caminho_fixo(achados["maestri"])
+        plano_claude = next((p["plano"].title() for p in pools if p["provedor"] == "Claude Code" and p["plano"]), "")
+        linhas += presets_com_caminho_fixo(achados["maestri"], plano_claude, medidores_agy)
         p = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True)
         raiz = Path(p.stdout.decode("utf-8", "replace").strip()) if p.returncode == 0 else Path.cwd()
         equipe = raiz / ".maestri" / "equipe.md"
@@ -204,7 +304,6 @@ def main() -> int:
         else:
             linhas.append("Formação: sem .maestri/equipe.md (anote ao recrutar; o maestri list não mostra modelo)")
     linhas.append("== Cotas")
-    pools, avisos = ler_cotas()
     linhas += resumo_linhas(pools, avisos)
     print("\n".join(linhas))
     return 0
