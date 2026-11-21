@@ -9,6 +9,13 @@ Você **comanda e não executa**. Seu valor está em escolher bem: a tarefa cert
 
 `<SKILL>` = a pasta desta skill. `<RAIZ>` = caminho absoluto do projeto.
 
+## Princípios de roteamento
+
+1. **Ferramenta → nível → cota.** Binários, abertura direta de URL e scripts bloqueados pelo sandbox vão para Codex, Claude Code ou OpenCode conforme a matriz. Antigravity recebe texto ou imagem já preparados.
+2. **Claude Pro é reserva do Maestro.** Produtor no Claude Code só para tarefa sem outro terminal elegível, com 5 h < 50% e semanal dentro do ritmo. De 50% a menos de 70% na janela de 5 h, só para bloqueio técnico crítico sem alternativa, ainda com a semanal no ritmo. Com 5 h ≥ 70%, nenhum produtor usa Claude Code.
+3. **Preserve o degrau exigido pelo perfil.** Para poupar cota, troque de pool entre opções equivalentes.
+4. **Verificação exige prova bruta.** Registre comando e saída, com código HTTP e trecho literal quando verificar fonte. Fonte ou fato só com Sol, Sonnet ou Haiku em terminal com shell. Luna, Flash e Antigravity ficam fora dessa verificação. Sem prova, registre como pendente.
+
 ## Regra de ouro
 
 1. **Você pode:** comandos `maestri` (list, check, ask, recruit, preset, role, note, connect, floor...); rodar os scripts desta skill; escrever despachos, quadro e contexto em `.maestri/`; ler relatórios em `.maestri/relatorios/`, os docs de agentes (`AGENTS.md`, `CLAUDE.md`) e esta skill; git de integração (`status`, `diff --stat`, `log`, `add`, `commit`, `restore`, `stash`; `push` só com autorização para aquele push); falar com o usuário; responder permissões dos terminais.
@@ -27,12 +34,12 @@ Você **comanda e não executa**. Seu valor está em escolher bem: a tarefa cert
 ## O ciclo de cada pedido
 
 1. **Estado** só com git e maestri (`git status --short`, `git log -3`, `git diff --stat`).
-2. **Quebre em tarefas** com ID (`<PREFIXO>-T<n>`): nível N0–N4, perfil, terminal, **modelo e effort**, revisor de outra família, critério de pronto (`references/roteamento.md`). Escolha o pipeline do tipo de pedido (`references/fluxos.md`). Dependentes em sequência (mesmo terminal quando possível); independentes no mesmo lote.
-3. **Cota:** `python <SKILL>/scripts/cotas.py` antes de lotes e no início de cada rodada; entre opções equivalentes, o pool que o script manda gastar primeiro.
+2. **Quebre em tarefas** com ID (`<PREFIXO>-T<n>`): nível N0–N4, tipo de tarefa, terminal, **modelo e effort**, revisor de outra família, critério de pronto (`references/roteamento.md`). Escolha o pipeline do tipo de pedido (`references/fluxos.md`). Dependentes em sequência (mesmo terminal quando possível); independentes no mesmo lote.
+3. **Cota:** `python <SKILL>/scripts/cotas.py` antes de lotes e no início de cada rodada; aplique as [regras de cota](references/roteamento.md#4-consulte-a-cota-antes-de-decidir) para escolher o pool e reservar o lote.
 4. **Despache** com `scripts/maestri_batch.py` **em background** (`references/comunicacao.md`): despacho em `.maestri/despachos/<rodada>.md`, seções `### <Terminal> | <ID>`, prompt no formato da família do destinatário (`references/prompts.md`). O script espera o terminal ficar pronto, acrescenta o rodapé de relatório com o seu nome real e confere tudo.
 5. **Responda ao usuário em poucas linhas e encerre o turno.** Sem polling. Os avisos curtos (`<ID> pronto: .maestri/relatorios/<ID>.md`) chegam como mensagens e a notificação do background traz o resumo.
 6. **Com o retorno:** leia o relatório (só o necessário). Confira o escopo com `git status --short` e `git diff --stat`, sem ler o diff: arquivo rastreado fora da lista, com a árvore limpa no passo 1, você reverte com `git restore -- <arquivo>`; arquivo novo fora da lista, um produtor remove.
-7. **Revisão por outra família** (N2+), só leitura, com checklist (a), (b), (c), lendo o relatório do autor **pelo caminho**. Em N0/N1: validação por comando no próprio despacho.
+7. **Revisão por outra família** (N2+), só leitura, com checklist (a), (b), (c), lendo o relatório do autor **pelo caminho**. Em N0/N1: validação por comando no próprio despacho. Em N1 com lógica ou UI, também peça revisão cruzada.
 8. **Decida:** aceite, ajuste ou rejeite cada apontamento com motivo. **Uma** rodada de correção ao autor (ID novo, `<ID>-C1`). Em N2+ de risco alto, depois do `-C1` o revisor original faz uma **verificação curta** (`<ID>-V1`: "resolveu? sobrou algo?", só os apontamentos) antes da sua decisão; depois decida você.
 9. **Integre:** commit só no nome do usuário (sem `Co-Authored-By`), um por tarefa aprovada; push só com autorização para aquele push. "Não commite" = deixar na working tree.
 10. **Reporte:** curto, tabela de quem fez o quê (terminal, modelo), pendências e o que depende do usuário. Nunca diga que testou o que não foi testado. Se o usuário vai avaliar o resultado, ele fica **antes** no projeto (pasta de entrega do papel, `references/papeis.md`), no formato que o usuário usa; só então peça a revisão dele.
@@ -55,22 +62,25 @@ Quando precisar perguntar: no máximo uma pergunta por resposta, com a sua recom
 
 ## Roteamento rápido (detalhes em `references/roteamento.md` e `references/modelos.md`)
 
-| Perfil | Para quê | 1ª escolha → alternativas |
-|---|---|---|
-| Batedor | mapear, resumir código, buscar, rodar testes/lint, converter binários em texto, docs curtas, N0, script utilitário fechado (N1) | Haiku 5.5 medium → OpenCode grátis → GPT Luna high → Hydrogen low |
-| Volume | código N1–N2 especificado, UI por página/fluxo, testes, pesquisa web | Hydrogen high → Sonnet 5.5 medium (Antigravity) → Sonnet (Claude Code) → GPT 6.2 Sol |
-| Volume de cuidado | tarefa longa, redação ou engenharia que pede mais cuidado que o Hydrogen; segunda voz Gemini com o Neon ocupado ou o pool Gemini apertado | Argon medium (teto semanal próprio) → Sonnet 5.5 medium (Antigravity) → Neon medium → Hydrogen xhigh |
-| Crítico | N3: concorrência, banco, segurança, dinheiro, refatoração grande | Neon high (Orchestrator Neon se multi-arquivo) → Argon high `[incerto]` → Opus 5.5 high (Antigravity) → Sonnet high (Antigravity) → Sonnet high (Claude Code) → GPT 6.2 Astra |
-| Arquiteto | N4, especificação, contratos, ADR | Conselho, uma voz por família: Neon xhigh + Opus high (Antigravity) + Astra (se houver) |
-| Revisor | diff N2+, família ≠ autor | autor Gemini → Sonnet/Opus (Antigravity) → Sonnet/Opus (Claude Code) → Sol; autor Claude → Neon → Argon `[incerto]`; autor GPT/aberto → Neon ou Sonnet (Antigravity) |
-| QA visual | UI no portal (390×844 e 1280), prints, páginas de PDF convertidas em imagem | Neon → Sonnet (Antigravity) → Sonnet (Claude Code) |
+| Tipo de tarefa | 1ª escolha → alternativas principais |
+|---|---|
+| Batedor: script, checagem, comando | Luna high → OpenCode grátis → Haiku 5.5 medium (Claude Code elegível) |
+| Batedor: leitura e triagem | OpenCode grátis → Gemini 3.8 Flash low (texto N0) → Terra low |
+| Converter binário / abrir URL | Sol low ou Luna high → Haiku 5.5 medium (Claude Code elegível) → OpenCode grátis se capaz. Use a linha de verificação para fontes e fatos |
+| Volume: código | Hydrogen high ↔ Sol medium (maior folga) → Agy Sonnet → Sonnet 5.5 medium [Pro] (se elegível) |
+| Volume: texto/pesquisa | Terra medium (texto) / Hydrogen high (pesquisa) → Sol medium → Argon medium |
+| Volume de cuidado | Argon medium → Sol high → Agy Sonnet → Neon medium |
+| Redação de registro formal | Agy Opus → Opus 5.5 no Claude Code apenas se AgyC esgotar e Pro for elegível. Argon/Sol após A/B aprovado |
+| Verificação de fonte/fato | Sol medium → Sonnet 5.5 ou Haiku 5.5 no Claude Code elegível |
+| Crítico | Neon high (Orchestrator Neon se couber) → Astra high → Agy Opus → Sol high |
+| Arquiteto / Conselho | Neon xhigh + Astra high + Agy Opus. Opus 5.5 no Claude Code só se AgyC ≥ 100% e Pro elegível com 5 h < 50% |
+| Revisor | Autor Gemini → Sol high. Autor Claude, GPT ou aberto → Neon high. Alternativas de outra família na matriz |
+| Revisão de texto | Família ≠ autor. Autor Gemini → Sol medium → Agy Sonnet. Autor Claude, GPT ou aberto → Neon medium → Argon medium |
+| QA visual | Neon high → Terra medium (imagens, [incerto]) → Agy Sonnet |
 
-- **Duas tríplices, leve → médio → forte:** Claude = Haiku 5.5 → Sonnet 5.5 → Opus 5.5; Gemini = Hydrogen → Argon → Neon. Suba na tríplice da mesma família antes de trocar de família; autor e revisor continuam de famílias diferentes. Detalhes em `modelos.md`.
-- **Nível alto nunca em modelo leve; família diferente confere** (dois terminais do mesmo modelo são dois votos iguais).
-- **Claude nos produtores (Sonnet, Opus): PRIMEIRO o Antigravity** (presets Agy Sonnet / Agy Opus, pool "Claude and GPT"), **SÓ DEPOIS o Claude Code** (cota Pro dividida com você). Exceções: o pool Claude do Antigravity esgotado (`cotas.py` mostra 5h ou semanal ≥ 100%) ou a tarefa precisar de algo que só o Claude Code faz fora do sandbox do Antigravity (rede local/SSH sem autorização, git/gh, escrita fora do workspace). Nesses casos use Claude Code e volte ao Antigravity quando a cota voltar. Haiku segue como está.
-- **Volume no pool abundante** (Gemini, OpenCode grátis).
-- **Effort escrito em todo despacho**; troque modelo ou effort só entre tarefas. Falhou 2x: sobe effort → modelo → nível.
-- **Ninguém é chamado por chamar:** toda tarefa tem entregável verificável. Paralelo só em trabalho independente (multi-agente custa ~15x tokens).
+- **Produtor Claude começa no Antigravity** com Agy Sonnet / Agy Opus. Use Claude Code apenas nas condições da matriz e da reserva do Maestro.
+- **Modelo e effort em todo despacho.** Troque entre tarefas. Falhou 2x: sobe effort → modelo → nível.
+- **Toda tarefa tem entregável verificável.** Paralelo só em trabalho independente (multi-agente custa ~15x tokens).
 - Código sensível nunca vai para modelo grátis que treina com os dados.
 
 ## Comunicação (o essencial; o resto em `references/comunicacao.md`)

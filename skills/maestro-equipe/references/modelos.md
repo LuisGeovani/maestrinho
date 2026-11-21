@@ -4,19 +4,31 @@ Atualizado em **2026-11-18**. Fontes e números completos: `docs/pesquisa/2026-1
 
 Nomes e IDs mudam rápido. Antes de criar presets, confira com `python <skill>/scripts/inventario.py` (lista o que o ambiente tem de verdade). Seção final: como atualizar este catálogo.
 
-## Tríplices: leve → médio → forte (suba na mesma família antes de trocar de família)
+## Escadas por família
 
-| Família | Leve | Médio | Forte |
+| Família | Degrau | Forte em | Evite |
 |---|---|---|---|
-| Claude | **Haiku 5.5** ($0,10/$0,50): Batedor, extração, checagens | **Sonnet 5.5** ($2/$10): produção do dia a dia, revisão de outra família, redação | **Opus 5.5** ($4/$20): N3/N4, decisão difícil |
-| Gemini | **Hydrogen** ($1,50/$7,50): código e texto bem especificados, lote | **Argon**: tarefa longa, redação/engenharia que pede mais cuidado que o Hydrogen | **Neon** ($3/$15): N3, revisão, QA visual, multimodal |
+| Claude | **Haiku 5.5** | Batedor, conversão de binário, abertura de URL e verificação com shell e prova bruta | lógica N2+ e tarefas que outro pool elegível cobre |
+| | **Sonnet 5.5** | produção cuidadosa, revisão de outra família, verificação com shell no Claude Code | volume que cabe no Hydrogen ou no Sol |
+| | **Opus 5.5** | redação de registro formal, N3/N4, voz Claude no Conselho | rotina e uso do Claude Pro fora da regra de reserva |
+| Gemini | **Gemini 3.8 Flash** | triagem e classificação N0 de texto já convertido | agente de terminal, código e verificação de fonte/fato |
+| | **Hydrogen** | código e UI bem especificados em lote, pesquisa ampla | escopo vago e verificação de fonte/fato |
+| | **Argon** | tarefa longa, redação ou engenharia cuidadosa, diff curto | N3 decisivo |
+| | **Neon** | N3, revisão de diff e de texto, QA visual, multimodal | trivial e xhigh sem necessidade |
+| GPT | **Luna** | script, configuração e checagem N0–N1 com passos fechados e teste automático obrigatório | engenharia aberta, redação e verificação de fonte/fato |
+| | **Terra** | escrita rápida, resumo, conversão de formato e visão | código difícil |
+| | **Sol** | padrão GPT: código por especificação, revisão de diff e verificação com shell e prova bruta | tarefa sem critério de aceite |
+| | **Astra** | N3/N4, testes focados em base existente e voz GPT no Conselho | rotina e lotes grandes |
+| Abertos | **OpenCode grátis** (ex.: `deepseek-v4.1-flash-free`) | Batedor de custo zero: leitura, resumo, testes com saída verificável | agente longo e código em modelo que treina com os dados |
+| | **OpenCode pago** (quando contratado) | implementação média com um modelo disponível e adequado ao perfil | assumir equivalência ou cota com base só no provedor |
 
-- Cota: Haiku/Sonnet/Opus no Antigravity = pool "Claude and GPT" (Claude Code só como reserva); Hydrogen e Neon = pool "Gemini Models" (5 h + semanal); **Argon = teto semanal próprio no Pro, não gasta o pool Gemini principal**. Custo relativo: Haiku < Sonnet < Opus; Hydrogen < Neon, com o Argon no meio `[incerto]` (preço de API do Argon não confirmado).
-- Qualidade relativa Argon × Neon (e Argon × Sonnet) **não medida** `[incerto]`: o catálogo lista o Neon acima; o Argon ainda está em teste. Em N3+ sem medida, prefira o Neon; o Argon é alternativa.
+Os abertos são a quarta família para roteamento. O catálogo de OpenCode abaixo detalha as opções. O pool "Claude and GPT" do Antigravity atende Agy Sonnet e Agy Opus. Hydrogen e Neon usam "Gemini Models", Argon tem teto semanal próprio e os quatro GPT compartilham o medidor Codex. Para o Gemini 3.8 Flash, confirme o medidor no ambiente [incerto].
+
+A qualidade relativa de Argon × Neon e Argon × Sonnet segue sem medida [incerto]. Em N3 decisivo, prefira Neon. Veja a matriz e as regras de cota em `roteamento.md`.
 
 ## Claude (Opus e Sonnet: PRIMEIRO no Antigravity, pool "Claude and GPT"; SÓ DEPOIS no Claude Code)
 
-Para produtores Sonnet/Opus use os presets Agy Sonnet / Agy Opus; o Claude Code (cota Pro dividida com o Maestro) é reserva. Exceções: pool Claude do Antigravity esgotado (`cotas.py` com 5h ou semanal ≥ 100%) ou tarefa que precisa de algo que só o Claude Code faz fora do sandbox do Antigravity (rede local/SSH sem autorização, git/gh, escrita fora do workspace); nesses casos use Claude Code e volte ao Antigravity quando a cota voltar. Haiku segue como está.
+Para produtores Sonnet/Opus, use primeiro Agy Sonnet / Agy Opus. O Claude Pro é reserva do Maestro: só use um produtor no Claude Code quando a tarefa ficar sem outro terminal elegível e a reserva permitir, inclusive para Haiku. A matriz em `roteamento.md` especifica quando o esgotamento do pool "Claude and GPT" habilita Opus no Claude Code.
 
 | Modelo | Bom em | Evite | Effort |
 |---|---|---|---|
@@ -26,10 +38,10 @@ Para produtores Sonnet/Opus use os presets Agy Sonnet / Agy Opus; o Claude Code 
 | **Haiku 5.5** ($0,10/$0,50 até 100K de prompt) | exploração, busca, extração, resumo de código para o Maestro, config repetitiva, lote, checagens com saída verificável | lógica N2+, prompt acima de 100K (preço 5x), instrução longa em low (pula checagens) | medium; low em lote trivial; high em instrução rígida e longa |
 
 - Claude Code: `--model haiku|sonnet|opus|fable` e `--effort low|medium|high|xhigh|max`. O padrão do Claude Code é medium para os quatro; declare sempre.
-- Anthropic mediu: Opus orquestrando Sonnet ≈ 1/3 mais barato com a mesma nota; Fable orquestrando, 19% mais caro sem ganho; trabalhadores Haiku −32% de custo e −4 pts. Por isso o Maestro roda Opus e o Haiku fica no perfil Batedor.
+- Anthropic mediu: Opus orquestrando Sonnet ≈ 1/3 mais barato com a mesma nota; Fable orquestrando, 19% mais caro sem ganho; trabalhadores Haiku −32% de custo e −4 pts. Por isso o Maestro roda Opus, e Haiku entra como Batedor de reserva quando a tarefa exige Claude Code e a reserva do Claude Pro permite.
 - Plano: Pro e Max dividem 5 h + semanal entre o chat e o Claude Code (e com o Maestro). Max = 5x Pro; Ultra (ex-Max 20x) = 10x Pro por semana.
 
-## Gemini (Antigravity `agy`; pool "Gemini Models" 5 h + semanal; Argon tem teto semanal próprio no Pro; tríplice Hydrogen → Argon → Neon)
+## Gemini (Antigravity `agy`; pool "Gemini Models" 5 h + semanal; Argon tem teto semanal próprio no Pro)
 
 IDs = `<modelo>-<effort>` (ex.: `gemini-4-neon-high`). Effort maior gasta mais cota.
 
@@ -39,8 +51,8 @@ IDs = `<modelo>-<effort>` (ex.: `gemini-4-neon-high`). Effort maior gasta mais c
 | **Gemini 4 Hydrogen** ($1,50/$7,50) | o "burro de carga": volume de código bem especificado, UI em lotes por página/fluxo, edições cirúrgicas (até 81% menos overreach), pesquisa web; TB 4.1 57%; ~2,5x mais rápido que o 3.8 Flash | tarefa vaga, sem escopo fechado | high; medium em código interativo e protótipo de UI; low em trivial |
 | **Orchestrator (Neon)** `gemini-pro-orchestrator-neon` | features, bugs, refatoração e debug **multi-arquivo**: Neon planeja só-leitura e revisa, Hydrogen executa (na versão Carbon: −24% de cota) | design de sistemas, concorrência, migrações (use o modelo puro) | fixo |
 | **Orchestrator (Argon)** `gemini-pro-orchestrator-g1-pro` | o mesmo, com Argon planejando | — | fixo |
-| **Gemini 4 Argon** (30/09/2026) | **modelo principal de nível médio** da tríplice Gemini: tarefa longa e de redação/engenharia que pede mais cuidado que o Hydrogen, refatoração ampla, segunda voz Gemini com o Neon ocupado; AA 50, DeepSWE 77,9%, multimodal denso (LVBench 91,7%); **teto semanal próprio** (não gasta o pool Gemini principal) | N3 de risco alto e revisão decisiva (o Neon supera o Argon em qualidade `[incerto]`); volume trivial (gasta o teto à toa) | medium; high no difícil; low só em trivial |
-| **Gemini 3.8 Flash** | texto, triagem; único modelo em todos os planos | agente de terminal (TB 4.1 18%), fabrica 5x mais que o Hydrogen | low/medium |
+| **Gemini 4 Argon** (30/09/2026) | **modelo principal de nível médio** da escada Gemini: tarefa longa e de redação/engenharia que pede mais cuidado que o Hydrogen, refatoração ampla, segunda voz Gemini com o Neon ocupado; AA 50, DeepSWE 77,9%, multimodal denso (LVBench 91,7%); **teto semanal próprio** (não gasta o pool Gemini principal) | N3 de risco alto e revisão decisiva (o Neon supera o Argon em qualidade `[incerto]`); volume trivial (gasta o teto à toa) | medium; high no difícil; low só em trivial |
+| **Gemini 3.8 Flash** | triagem e classificação N0 de texto já convertido; disponível em todos os planos | agente de terminal (TB 4.1 18%), código e verificação de fonte/fato | low/medium |
 | **Gemini 4 Carbon** | o mais forte para tarefas longas | só Ultra/Enterprise (aparece "Unavailable" no Pro); lento | medium |
 | **Claude Opus 5.5 / Sonnet 5.5 no agy** | os mesmos modelos da Anthropic **sem gastar o Claude Pro** (pool "Claude and GPT"); **1ª escolha** para produtor Claude, antes do Claude Code | — | até high |
 | **GPT-OSS 120B** | — | sendo removido ("Notice", 18/11/2026) | não rotear |
@@ -53,10 +65,10 @@ Versão vigente: **GPT-6.2** (17/11/2026). Efforts no Codex: `low`, `medium`, `h
 
 | Modelo | Bom em | Evite | Effort |
 |---|---|---|---|
-| **gpt-6.2-astra** ($8/$40) | topo: projetos mais difíceis, código limpo e testes focados em base existente; segunda opinião em N4 | rotina (Plus: só 6–50 msgs por 5 h) | padrão do cliente; high em N4 |
-| **gpt-6.2-sol** ($2/$10) | uso diário: código, agentes, **revisão de diff** com visão GPT (a 0,5 pt da Astra por ~1/5 do custo) | — | medium; high em revisão difícil |
-| **gpt-6.1-terra** ($1/$5) | rápido: escrita, visão | código difícil (TB 53%) | medium |
-| **gpt-6-luna** ($0,10/$0,50) | volume repetitivo e bem delimitado: scripts, configs, checagens | engenharia aberta (alucinação 77%, TB 15%) | começar em high |
+| **gpt-6.2-astra** ($8/$40) | N3/N4, código e testes focados em base existente; voz GPT no Conselho | rotina (Plus: só 6–50 msgs por 5 h) | high em N3/N4; xhigh só com ganho real |
+| **gpt-6.2-sol** ($2/$10) | padrão GPT: código por especificação, verificação com shell e **revisão de diff** (a 0,5 pt da Astra por ~1/5 do custo) | — | medium; high em revisão difícil |
+| **gpt-6.1-terra** ($1/$5) | escrita rápida, resumo, conversão de formato e visão | código difícil (TB 53%) | medium; low em triagem textual |
+| **gpt-6-luna** ($0,10/$0,50) | volume N0–N1: scripts, configs e checagens com passos fechados e teste automático obrigatório | engenharia aberta, redação e verificação de fonte/fato (alucinação 77%, TB 15%) | high para scripts; medium em N0 trivial |
 | gpt-5.6 sol/terra/luna | geração anterior (aparecem no plano Free) | — | — |
 | gpt-reserve | "Luna Reserve": uso extra com 5.6 Luna quando a cota acaba | não é modelo de trabalho | — |
 | codex-auto-review | revisor automático de pedidos de sandbox | não despachar tarefas | — |

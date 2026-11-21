@@ -15,7 +15,7 @@ O formato é escolhido pelo **destinatário**, não pelo autor da tarefa. O roda
 
 Teste do bom despacho (Anthropic): um colega competente, sem nenhum contexto, faria a tarefa só com esse texto?
 
-## 1. Gemini (Antigravity: Neon, Hydrogen, Orchestrator, Argon, Flash)
+## 1. Gemini (Antigravity: Neon, Hydrogen, Orchestrator, Argon, Gemini 3.8 Flash)
 
 Regras: XML ou Markdown (um só); contexto e arquivos no começo; ação, restrições, critério de pronto e saída **no fim**, com frase de ancoragem; listas curtas; lotes pequenos (1 página ou 1 fluxo); caminhos absolutos; **não** peça "pense passo a passo" (o thinking é nativo; suba o effort se precisar); o Gemini responde curto por padrão, então peça detalhe quando precisar. Modos de falha a prevenir: perde escopo em tarefa vaga, edita vizinhos (imports, estilos globais), inventa arquivos/rotas/pacotes, esquece restrições depois de muitas chamadas de ferramenta, entra em loop de erro.
 
@@ -60,7 +60,7 @@ Com base apenas nos arquivos acima, <repita a acao em uma frase>.
 
 Multi-arquivo no Antigravity: prefira o Orchestrator (planeja e executa) ou peça `/plan` antes de editar.
 
-Despacho Gemini só com **caminhos legíveis**: texto ou imagem. Binário (PDF, Office, zip...) vira texto antes, por um terminal Claude Code (`roteamento.md`), e o despacho cita o arquivo convertido. Script de verificação e listagem de pastas fora da pasta de papel: o sandbox pode bloquear; no "Valide" do despacho Gemini ponha só comando simples e despache a checagem por script a outro terminal.
+Despacho Gemini só com **caminhos legíveis**: texto ou imagem. Use Gemini 3.8 Flash apenas para triagem e classificação N0 de texto já convertido. Para PDF, Office ou zip, encaminhe a conversão conforme a matriz de `roteamento.md` e cite no despacho Gemini o arquivo convertido. Se uma validação depender de script bloqueado ou abertura direta de URL, despache essa parte a um terminal elegível com shell. Para verificação de fonte ou fato, peça prova bruta a Sol, Sonnet 5.5 ou Haiku 5.5 conforme a matriz.
 
 ## 2. Claude (Claude Code e Claude no Antigravity: Haiku, Sonnet, Opus, Fable)
 
@@ -76,17 +76,34 @@ Pronto quando: <criterios verificaveis>. Valide com <comando> e confira cada cri
 Nao faca: git, instalar pacotes, editar fora das pastas. Mesmo erro 2x: pare e reporte bloqueado.
 ```
 
-## 3. GPT (Codex)
+## 3. Despacho para GPT (Codex)
 
-Regras: as quatro partes da OpenAI (objetivo, contexto, restrições, pronto quando) + **como validar**; siga no escopo, registre suposições, pare só em bloqueio ou decisão do usuário; confira cada parte do pedido antes de terminar; reaproveite a lógica existente. **Proíba computer use e `/model`** (o Codex já tentou controlar o computador para ver o próprio modelo).
+Dê um objetivo em uma frase, os arquivos exatos a ler e a lista de escrita permitida. Proíba explorar o repositório inteiro para preservar a janela de 5 h. Especifique o arquivo de saída, o formato e um exemplo ou esquema. Registre as decisões já tomadas e os arquivos ou trechos a preservar. Indique o padrão conservador a seguir na dúvida e peça que o agente registre a suposição. Pare por bloqueio real ou decisão do usuário.
+
+| Degrau | Modelo no Codex | O que muda no despacho |
+|---|---|---|
+| Luna | `gpt-6-luna` | Passos numerados, esquema rígido da saída e comando de teste automático obrigatório. Tarefa fechada N0–N1 |
+| Terra | `gpt-6.1-terra` | Texto-alvo, tamanho, registro e exemplo curto. Dê o formato de saída se a tarefa for conversão |
+| Sol | `gpt-6.2-sol` | Especificação, critérios de aceite numerados e comando exato de validação. Para verificar fonte ou fato, exija prova bruta |
+| Astra | `gpt-6.2-astra` | Objetivo, restrições e testes. Deixe a execução a cargo do agente dentro do escopo |
 
 ```
-TAREFA <ID> · N<n> · EDICAO · GPT 6.2 Sol, medium
-Projeto: <RAIZ>. Objetivo: <o que entregar>.
-Contexto: <arquivos, erro ou diff a revisar>. Fatos confirmados: <...>.
-Restricoes: so as pastas <pastas>; sem git; sem instalar pacotes; NAO use computer use nem controle do computador; NAO rode /model.
-Pronto quando: <criterios>. Valide com: <build e teste exatos>. Mesmo erro 2x: pare e reporte bloqueado.
+TAREFA <ID> · N<n> · <EDICAO | SOMENTE LEITURA> · <modelo e effort>
+Projeto: <RAIZ> (branch <b>; nao troque).
+Objetivo: <o que entregar em uma frase>.
+Leia apenas: <arquivos exatos>. Nao explore o repositorio inteiro.
+Fatos confirmados e decisoes ja tomadas: <...>.
+Escopo: <arquivos autorizados e trechos a preservar>.
+Saida: <arquivo, formato e exemplo ou esquema>.
+Restricoes: sem mutacoes git ou instalacao de pacotes. Nao use computer use nem controle do computador. Nao rode /model.
+Na duvida, use <padrao conservador> e registre a suposicao. Mesmo erro 2x: pare e reporte bloqueado.
+Pronto quando:
+1. <criterio verificavel>
+2. <criterio verificavel>
+Valide com: <comando exato>. Relate cada criterio no formato criterio → sim/nao → evidencia.
 ```
+
+O relatório inclui comando e saída relevantes e, para fontes, código HTTP e trecho literal. Sem prova bruta, marque o critério como pendente. Antes de despachar um lote grande, ensaie um item representativo e confira o resultado contra os critérios antes de liberar o restante.
 
 ## 4. Modelos abertos (OpenCode grátis ou pagos)
 
@@ -113,7 +130,7 @@ Responda com: recomendacao, 2-3 alternativas com trade-offs, riscos, e o que mud
 Mesmo erro 2x: pare e reporte. SOMENTE LEITURA: nao edite nem crie arquivos (so o relatorio).
 ```
 
-Pesquisa: diga as fontes esperadas (oficiais primeiro, um benchmark independente), peça URL ao lado de cada fato e `[incerto]` no que não confirmou.
+Pesquisa: diga as fontes esperadas (oficiais primeiro, um benchmark independente), peça URL ao lado de cada fato e `[incerto]` no que não confirmou. Para declarar uma fonte verificada, encaminhe a um terminal da linha “Verificação de fonte/fato” da matriz e peça a prova bruta.
 
 ## 6. Revisão
 

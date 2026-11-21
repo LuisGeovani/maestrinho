@@ -21,15 +21,17 @@ Todos participam, mas **ninguém é chamado por chamar**: uma etapa só existe s
 
 | Pedido | Etapas (perfil · exemplo de modelo) |
 |---|---|
-| **Feature N2** | Mapear (Batedor · Haiku) → Implementar (Volume · Hydrogen high) → Revisar (Sonnet medium) → 1 rodada de correção → Integrar |
+| **Feature N2** | Mapear (Batedor · OpenCode grátis para leitura) → Implementar (Volume · Hydrogen high ou Sol medium, conforme a folga) → Revisar (Sol high se o autor for Gemini, Neon high se for GPT) → 1 rodada de correção → Integrar |
 | **Bug** | Mapear + reproduzir (Batedor) → Corrigir + teste de regressão (Volume, ou Crítico se N3) → Revisar (outra família) |
-| **N3 crítico** | Especificar (Arquiteto · Opus no Antigravity) → Testes (família A · Sonnet) → Implementar (família B · Neon high) → Red team se houver risco (família C · GPT, ou outro modelo Claude/Gemini) → Revisar |
-| **UI** | Implementar por página ou fluxo (Volume · Hydrogen) → QA visual (Neon) → Revisar código (Claude · Sonnet) |
-| **Refatoração ampla** | Mapear → Orchestrator Neon (planeja e executa) ou Crítico → testes existentes rodados pelo Batedor → Revisar (Claude) |
-| **Pesquisa** | 2–3 famílias em paralelo, cada uma com fontes ou ângulo próprio, só leitura → Consolidar (Batedor) → o Maestro lê só o consolidado |
-| **Decisão N4** | Conselho em paralelo, só leitura (uma voz por família, ângulos diferentes: arquitetura, riscos, alternativa simples/custo) → o Maestro sintetiza consensos, divergências e recomendação → o usuário decide → Batedor registra o ADR com as visões vencidas |
-| **Docs ou config N0–N1** | Batedor faz + grep de validação no próprio despacho; sem revisor |
+| **N3 crítico** | Especificar (Arquiteto · Agy Opus) → Testes (família A · Sol medium com shell) → Implementar (família B · Neon high) → Red team se houver risco (terceira família elegível quando possível) → Revisar |
+| **UI** | Implementar por página ou fluxo (Volume · Hydrogen) → QA visual (Neon high) → Revisar código (Sol high se o autor for Gemini) |
+| **Refatoração ampla** | Mapear → Orchestrator Neon (planeja e executa) ou Crítico → testes existentes rodados pelo Batedor → Revisar (Sol high se o autor for Gemini) |
+| **Pesquisa** | 2–3 famílias em paralelo, cada uma com fontes ou ângulo próprio, só leitura → Verificar fonte/fato com Sol, Sonnet 5.5 ou Haiku 5.5 em terminal com shell e prova bruta → Consolidar (Batedor) → o Maestro lê só o consolidado |
+| **Decisão N4** | Conselho em paralelo, só leitura (Neon xhigh, Astra high e Agy Opus conforme a matriz e a cota, uma voz por família) → o Maestro sintetiza consensos, divergências e recomendação → o usuário decide → Batedor registra o ADR com as visões vencidas |
+| **Docs ou config N0–N1** | Batedor faz + grep de validação no próprio despacho. Em N1 com lógica ou UI, também há revisão cruzada |
 | **Entender o projeto** (sessão nova, código desconhecido) | Batedor gera um resumo de até 40 linhas em `.maestri/contexto/projeto.md`; o Maestro lê só isso |
+
+Aplique a matriz de `roteamento.md` para escolher o terminal e a família de cada etapa. Separe a pesquisa ampla da verificação de fonte/fato. Prepare binários e execute scripts que o sandbox bloqueia em terminais elegíveis com shell antes de repassar os resultados ao Antigravity.
 
 ## Paralelo, dependência e arquivos compartilhados
 

@@ -24,20 +24,24 @@ Presets são **globais** (valem em todos os workspaces). Não grave o caminho do
 | Haiku | `claude --model haiku --effort medium --add-dir ../../..` |
 | Sonnet | `claude --model sonnet --effort medium --add-dir ../../..` |
 | Sonnet High | `claude --model sonnet --effort high --add-dir ../../..` |
+| Agy Flash | `agy --model gemini-3.8-flash --add-dir ../../..` (triagem N0; confirme o ID e prefira low quando oferecido em `agy models`) |
 | Agy Hydrogen | `agy --model gemini-4-hydrogen-high --add-dir ../../..` |
 | Agy Argon | `agy --model gemini-4-argon-high --add-dir ../../..` |
 | Agy Neon | `agy --model gemini-4-neon-high --add-dir ../../..` |
 | Agy Orchestrator Neon | `agy --model gemini-pro-orchestrator-neon --add-dir ../../..` |
 | Agy Opus | `agy --model claude-opus-5-5-high --add-dir ../../..` |
 | Agy Sonnet | `agy --model claude-sonnet-5-5-medium --add-dir ../../..` |
-| Codex Luna | `codex -m gpt-6-luna -c model_reasoning_effort=high` + variáveis do Maestri (seção 6); com Plus, crie também "Codex Sol" (`gpt-6.2-sol`, medium) |
+| Codex Luna | `codex -m gpt-6-luna -c model_reasoning_effort=high --add-dir ../../..` + variáveis `MAESTRI_*` ([§6](#6-codex)) |
+| Codex Terra | `codex -m gpt-6.1-terra -c model_reasoning_effort=medium --add-dir ../../..` + variáveis `MAESTRI_*` ([§6](#6-codex)) |
+| Codex Sol | `codex -m gpt-6.2-sol -c model_reasoning_effort=medium --add-dir ../../..` + variáveis `MAESTRI_*` ([§6](#6-codex)) |
+| Codex Astra | `codex -m gpt-6.2-astra -c model_reasoning_effort=high --add-dir ../../..` + variáveis `MAESTRI_*` ([§6](#6-codex)) |
 | OpenCode Gratis | `$env:OPENCODE_CONFIG="<SKILL>/maestro/opencode-gratis.json"; opencode --standalone` (seção 7) |
 
 ```
 maestri preset create "Haiku" --command "claude --model haiku --effort medium --add-dir ../../.." --quick-start off
 ```
 
-- **Produtor Claude: padrão = Agy Sonnet / Agy Opus** (Antigravity, pool "Claude and GPT"). Os presets Sonnet / Sonnet High (Claude Code, cota Pro dividida com o Maestro) são **reserva**: só quando o pool Claude do Antigravity esgotar (`cotas.py` com 5h ou semanal ≥ 100%) ou a tarefa precisar de algo que só o Claude Code faz fora do sandbox do Antigravity (rede local/SSH sem autorização, git/gh, escrita fora do workspace); volte ao Antigravity quando a cota voltar. Ao propor a formação, ponha Agy Sonnet/Agy Opus nos produtores Claude. Haiku segue como está.
+- **Produtor Claude: Agy Sonnet / Agy Opus primeiro** (Antigravity, pool "Claude and GPT"). O Claude Pro é reserva do Maestro. Sonnet, Sonnet High e Haiku no Claude Code seguem as regras de elegibilidade de `roteamento.md` §4.
 - `../../..` só vale com `--role`. Sem papel, o agente abre na pasta do workspace: use `--dir <RAIZ>` e nenhum `--add-dir`.
 - Presets antigos com caminho de projeto fixo continuam funcionando, mas pare de criar novos; prefira os genéricos. Use nomes que não colidam com presets antigos (ex.: "Haiku" em vez de um "Claude Haiku" que já aponta para outro projeto).
 - **Preset com caminho fixo:** o `inventario.py` lista, uma linha por preset, os que têm `--add-dir`/`--dir` com caminho absoluto (ou do diretório pessoal), que quase sempre é de outro projeto. Corrija com `maestri preset set "<Nome>" --command "<comando genérico da tabela acima>"` (ou crie o genérico e apague o antigo) e reabra os terminais que o usam com `recruit --replace`. `--dir <RAIZ>` de um preset sem papel é uso legítimo: o aviso só pede que você confirme que a pasta é deste projeto.
@@ -48,22 +52,24 @@ maestri preset create "Haiku" --command "claude --model haiku --effort medium --
 
 ### Formação padrão (o que propor ao usuário)
 
-Uma vaga por degrau das duas tríplices (`modelos.md`). Proponha, confirme e anote em `.maestri/equipe.md`. Efforts: `roteamento.md` §3. O effort da vaga é o do preset; para uma tarefa mais leve (ex.: Argon medium), use `recruit --command` (acima) em vez de outro preset.
+Proponha, confirme e anote em `.maestri/equipe.md` uma vaga por degrau ativo. Efforts em `roteamento.md` §3. Para variar o effort entre tarefas, use `recruit --command` com o preset.
 
-**Com os dois planos (Claude e Gemini):** seis vagas.
+**Com três planos pagos (Claude, Gemini e Codex): 7 a 8 vagas de produção.** Sete vagas base e uma oitava se houver demanda por Batedor no OpenCode grátis.
 
 | Vaga | Preset | Função típica |
 |---|---|---|
-| Haiku medium | "Haiku" | Batedor: mapear, resumir, rodar testes/lint, converter binários em texto, script utilitário fechado |
-| Sonnet medium | "Agy Sonnet" | produção cuidadosa Claude; revisor de autor Gemini; QA visual com olho de design |
-| Opus high | "Agy Opus" | Arquiteto e Crítico N3/N4; voz Claude do Conselho |
-| Hydrogen high | "Agy Hydrogen" | Volume: código e UI especificados, em lote, pesquisa web |
-| Argon (preset high; medium via `--command`) | "Agy Argon" | Volume de cuidado: tarefa longa, redação ou engenharia; segunda voz Gemini (teto semanal próprio) |
-| Neon high | "Agy Neon" | Crítico N3; revisor de autor Claude; QA visual; multimodal |
+| Luna high | Codex Luna | Batedor: script utilitário, configuração e checagem fechada com teste automático |
+| Sol medium | Codex Sol | Volume de código e verificação de fonte/fato. High para revisão de autor Gemini e N3 conforme a matriz |
+| Sonnet 5.5 medium | Agy Sonnet | Produção cuidadosa, revisão de outra família conforme a matriz e QA visual |
+| Opus 5.5 high | Agy Opus | Redação de registro formal, Crítico N3 e voz Claude do Conselho |
+| Hydrogen high | Agy Hydrogen | Volume de código, UI especificada e pesquisa ampla |
+| Argon high (medium via `--command`) | Agy Argon | Volume de cuidado, com teto semanal próprio |
+| Neon high | Agy Neon | Crítico, Revisor e QA visual. Xhigh para o Conselho |
+| OpenCode grátis (opcional) | OpenCode Gratis | Batedor de leitura, triagem e comandos pequenos quando o preset estiver disponível |
 
-**Com um plano só:** três vagas, um terminal por degrau da tríplice disponível (Haiku, Sonnet, Opus; ou Hydrogen, Argon, Neon), com o leve fazendo Batedor e Volume. Acrescente o OpenCode grátis como Batedor de outra família, se instalado (nunca com código sensível). Sem outra família para conferir, avise o usuário em uma linha: o revisor será outro degrau da mesma família, voto menos independente que o de outra.
+**Sob demanda:** recrute ou use `recruit --replace` entre tarefas para Astra (N3/N4 e Conselho), Terra (escrita, resumo, formato) ou Gemini 3.8 Flash (triagem textual N0). Haiku no Claude Code só entra se a reserva permitir. Orchestrator Neon e terminais extras entram conforme o volume e a cota.
 
-Terminais extras (Codex, Orchestrator Neon, segundo Hydrogen) só quando a cota e o volume pedem; ninguém é recrutado por recrutar.
+**Com menos planos:** monte a equipe com os degraus disponíveis que a demanda pede. Aplique a reserva do Claude Pro mesmo na formação reduzida. Acrescente OpenCode grátis quando houver tarefa compatível. Se faltar outra família qualificada para revisar, avise o usuário e registre a revisão como pendente.
 
 ## 3. Papéis
 
@@ -76,7 +82,7 @@ python <SKILL>/scripts/criar_papel.py "<Nome>" --projeto "<Projeto>" --raiz "<RA
 ```
 
 - Grava `<RAIZ>/.maestri/papeis/<Nome>.md` (UTF-8 sem BOM). Sem `--aplicar`, só grava e mostra o resumo; revise e rode de novo com `--aplicar`.
-- `--aplicar` roda `maestri role create`, ou `maestri role write` se o `role show` achar o papel (só no terminal Maestro). Perfis: os nomes das linhas de perfil de `papeis.md`. Sem `--pastas`: "as do despacho"; sem `--entrega`: "nenhuma". `--ferramenta` junta o bloco do Antigravity, Codex ou OpenCode.
+- `--aplicar` roda `maestri role create`, ou `maestri role write` se o `role show` achar o papel (só no terminal Maestro). Use em `--perfis` os rótulos dos [perfis de papel](papeis.md). Sem `--pastas`: "as do despacho"; sem `--entrega`: "nenhuma". `--ferramenta` junta o bloco do Antigravity, Codex ou OpenCode.
 - Os campos de caminho (`<RAIZ>`, `--pastas`, `--entrega`) vão com barras normais (o CLI decodifica `\n` e `\t` nos argumentos). Depois do `--aplicar` o script confere com `role show` e avisa (saída 3) se o texto ficou truncado.
 
 À mão (ajustes e papéis fora do padrão):
@@ -118,20 +124,21 @@ Não crie band sem o usuário pedir, e não conecte produtores entre si: tudo pa
 - O papel do Antigravity leva o bloco "Antigravity" de `papeis.md` (se der access denied, rode SOMENTE o comando maestri fora do sandbox).
 - O agy abre em modo `auto` (edições e comandos seguros aprovados). Ao lançar modelo novo, aparece um banner "Introducing …"; ele some sozinho com o primeiro prompt.
 - Skills globais do agy: `~/.gemini/config/skills/` (também lê `~/.gemini/skills/`).
-- **Limites do sandbox:** o `read_file` do agy **recusa arquivos binários** (PDF, Office, zip...) e o sandbox bloqueia rodar scripts e listar pastas fora da pasta de papel. Efeito já visto: tarefa bloqueada e checagem que não rodou. Regra: converta o binário para texto num terminal Claude Code **antes** de despachar ao Antigravity, e rode scripts de verificação **fora** dele (Claude Code, Codex ou OpenCode). Texto e imagem o agy lê. Detalhe em `roteamento.md` e `prompts.md` §1.
+- **Limites do sandbox:** o `read_file` do agy **recusa arquivos binários** (PDF, Office, zip...) e o sandbox bloqueia rodar scripts e listar pastas fora da pasta de papel. Efeito já visto: tarefa bloqueada e checagem que não rodou. Regra: converta o binário para texto em terminal com shell elegível **antes** de despachar ao Antigravity e rode scripts bloqueados **fora** dele. Texto e imagem o agy lê. Detalhe em `roteamento.md` e `prompts.md` §1.
 
 ## 6. Codex
 
-Preset com as variáveis do Maestri (o Codex não as herda sozinho):
+Os quatro presets Codex reutilizam o bloco `MAESTRI_*` abaixo na configuração do comando, pois o Codex não herda essas variáveis sozinho. Use o modelo e o effort da tabela de presets, mantendo todas as opções `shell_environment_policy.set.MAESTRI_*` do bloco.
 
 ```
-codex -m <modelo> -c model_reasoning_effort=<effort> -c "shell_environment_policy.set.MAESTRI_PIPE='$env:MAESTRI_PIPE'" -c "shell_environment_policy.set.MAESTRI_TERMINAL_ID='$env:MAESTRI_TERMINAL_ID'" -c "shell_environment_policy.set.MAESTRI_WORKSPACE_ID='$env:MAESTRI_WORKSPACE_ID'" -c "shell_environment_policy.set.MAESTRI_DATA_DIR='$env:MAESTRI_DATA_DIR'" -c "shell_environment_policy.set.MAESTRI_CLI='$env:MAESTRI_CLI'"
+codex -m <modelo> -c model_reasoning_effort=<effort> --add-dir ../../.. -c "shell_environment_policy.set.MAESTRI_PIPE='$env:MAESTRI_PIPE'" -c "shell_environment_policy.set.MAESTRI_TERMINAL_ID='$env:MAESTRI_TERMINAL_ID'" -c "shell_environment_policy.set.MAESTRI_WORKSPACE_ID='$env:MAESTRI_WORKSPACE_ID'" -c "shell_environment_policy.set.MAESTRI_DATA_DIR='$env:MAESTRI_DATA_DIR'" -c "shell_environment_policy.set.MAESTRI_CLI='$env:MAESTRI_CLI'"
 ```
 
+- Com `--role`, o Codex abre em `<RAIZ>/.maestri/roles/<id>/`. Use `--add-dir ../../..` para incluir a raiz do projeto, como nos outros presets com papel. Sem `--role`, omita essa opção.
 - O comando do preset roda no PowerShell no Windows (por isso `$env:`); em macOS/Linux use `$MAESTRI_PIPE` etc.
 - Sandbox no Windows: o sandbox elevado roda como outro usuário e não alcança a pasta do Maestri (doc de troubleshooting do Maestri). Opções: o modo sem sandbox que o usuário já usa, ou o sandbox não elevado em `[windows]` do `~/.codex/config.toml` `[incerto: nome exato do valor; confira em codex doctor]`. Libere comandos que começam com `maestri`.
 - Primeira vez numa pasta de papel: "Trust this folder?" (aprove com `--raw "\r"`).
-- O banner mostra a cota restante ("monthly limit: 8% left"): com pouca cota, só tarefas curtas.
+- O banner mostra a cota restante ("monthly limit: 8% left"): aplique as faixas da cota de `roteamento.md` §4.
 - Proíba computer use e `/model` no papel.
 
 ## 7. OpenCode
@@ -177,7 +184,7 @@ Sintoma: papéis citando outro projeto, presets com `--add-dir` de outra pasta, 
 | Terminal voltou ao shell após atualização | a ferramenta fechou ao atualizar | `recruit --replace` |
 | Classificador do Claude Code bloqueia `recruit --replace`, `git commit` ou push do Maestro | ação sensível no modo automático | explicar ao usuário e pedir que aprove ou rode |
 | Pergunta ao usuário some ou é respondida sozinha | aviso de produtor digitado em cima do diálogo | sem AskUserQuestion com tarefa em andamento |
-| Terminal Antigravity bloqueado ao ler PDF/Office/zip ou ao rodar script de checagem | `read_file` recusa binário e o sandbox bloqueia scripts (seção 5) | converta o binário para texto num terminal Claude Code antes de despachar; rode a checagem em outro terminal |
+| Terminal Antigravity bloqueado ao ler PDF/Office/zip ou ao rodar script de checagem | `read_file` recusa binário e o sandbox bloqueia scripts (seção 5) | converta o binário para texto e rode a checagem em terminal com shell elegível pela matriz |
 | Banner "Introducing …" no Antigravity | novidade de modelo | some com o primeiro prompt; não precisa de ação |
 | Produtor reporta despacho "truncado" ou o texto fica na caixa de entrada | despacho enviado enquanto o terminal abria | usar `maestri_batch.py` (espera o terminal ficar pronto e recupera o texto parado); com `maestri ask` direto, espere o prompt aparecer no `check` |
 | Relatório ou pesquisa vira instrução de projeto de repente | no Windows (e no macOS padrão) `claude.md` = `CLAUDE.md`, `agents.md` = `AGENTS.md`, `gemini.md` = `GEMINI.md`: as ferramentas carregam o arquivo como regra | nunca dê esses nomes a relatórios, pesquisas ou notas (use `anthropic.md`, `pesquisa-claude.md`...) |
