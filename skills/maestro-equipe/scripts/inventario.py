@@ -6,6 +6,8 @@ Uso:
 --rapido pula as consultas lentas (agy models, opencode models).
 Saída curta (cerca de 20 linhas), pensada para o contexto do Maestro.
 Só leitura: roda comandos de listagem e lê caches locais.
+Também avisa, uma linha por preset, dos presets com --add-dir/--dir de caminho absoluto
+(precisa do terminal Maestro: usa `maestri preset list` e `maestri preset show`).
 """
 import json
 import os
@@ -120,6 +122,52 @@ def nome_do_maestro(exe):
     return nome, agentes
 
 
+FLAG_DIR = re.compile(r"(?<![\w-])--(add-dir|dir)(?:\s+|=)(\"[^\"]*\"|'[^']*'|\S+)")
+CAMINHO_FIXO = re.compile(r"^(?:[A-Za-z]:[\\/]|[\\/]|~)")
+
+
+def nomes_de_presets(texto):
+    """Nome de cada linha de `maestri preset list`: o 1º trecho entre aspas ou o texto antes de ':'/' - '."""
+    nomes = []
+    for linha in texto.splitlines():
+        l = linha.strip().lstrip("-*•> ").strip()
+        if not l or l.endswith(":") and "\"" not in l:
+            continue
+        m = re.match(r'"([^"]+)"', l) or re.match(r"(.+?)(?:\s*[:—–]\s|\s+-\s|\s{2,}|$)", l)
+        if m and m.group(1).strip():
+            nomes.append(m.group(1).strip())
+    return nomes
+
+
+def caminhos_fixos(comando):
+    """[(flag, valor)] dos --add-dir/--dir cujo valor é caminho absoluto ou do diretório pessoal."""
+    achados = []
+    for flag, valor in FLAG_DIR.findall(comando):
+        valor = valor.strip("\"'")
+        if CAMINHO_FIXO.match(valor):
+            achados.append((f"--{flag}", valor))
+    return achados
+
+
+def presets_com_caminho_fixo(exe):
+    """Linhas do relatório: um preset suspeito por linha, ou uma linha só dizendo que está tudo bem."""
+    saida, erro = rodar([exe, "preset", "list"], timeout=20)
+    texto = saida or ""
+    if not texto.strip() or "not the Maestro" in texto or "not the Maestro" in (erro or ""):
+        return ["Presets: não verificado (só o terminal Maestro lê os presets)"]
+    suspeitos, vistos = [], set()
+    for nome in nomes_de_presets(texto)[:40]:
+        if nome in vistos:
+            continue
+        vistos.add(nome)
+        comando, _ = rodar([exe, "preset", "show", nome], timeout=20)
+        for flag, valor in caminhos_fixos(comando or ""):
+            suspeitos.append(f'  "{nome}": {flag} {valor}')
+    if not suspeitos:
+        return ["Presets: nenhum com caminho fixo"]
+    return ["Presets com caminho fixo (use o genérico: references/setup.md §2):"] + suspeitos
+
+
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     rapido = "--rapido" in sys.argv
@@ -145,6 +193,7 @@ def main() -> int:
         linhas.append("== Maestri")
         linhas.append(f"Você (nome para o ask back): {nome or '?'}")
         linhas.append("Conectados: " + (", ".join(agentes) if agentes else "nenhum"))
+        linhas += presets_com_caminho_fixo(achados["maestri"])
         p = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True)
         raiz = Path(p.stdout.decode("utf-8", "replace").strip()) if p.returncode == 0 else Path.cwd()
         equipe = raiz / ".maestri" / "equipe.md"

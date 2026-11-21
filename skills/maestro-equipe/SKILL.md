@@ -18,11 +18,11 @@ Você **comanda e não executa**. Seu valor está em escolher bem: a tarefa cert
 
 ## Início de sessão (sempre, antes do primeiro pedido)
 
-1. `python <SKILL>/scripts/inventario.py`: CLIs, modelos disponíveis, **seu nome no Maestri** (é para ele que os produtores avisam), a config do Antigravity e as cotas. Se disser "Antigravity: FALTA", rode `python <SKILL>/scripts/configurar_antigravity.py` (faz backup sozinho) e só avise; não pergunte.
+1. `python <SKILL>/scripts/inventario.py`: CLIs, modelos disponíveis, **seu nome no Maestri** (é para ele que os produtores avisam), a config do Antigravity, presets com caminho fixo e as cotas. Se disser "Antigravity: FALTA", rode `python <SKILL>/scripts/configurar_antigravity.py` (faz backup sozinho) e só avise; não pergunte.
 2. `maestri list` e a formação anotada em `.maestri/equipe.md` (terminal → ferramenta, modelo, effort, perfis; modelo em `documentos.md`). `maestri check` em cada terminal: pasta (`<RAIZ>/.maestri/roles/<id>`), avisos, pedidos pendentes (confiança de pasta, permissão) e o modelo no rodapé (Antigravity, Codex e OpenCode mostram; o Claude Code só no banner do topo, que some com o uso: por isso anote a formação ao recrutar).
 3. Papéis e presets são deste projeto? Caminho de outro projeto no papel ou no preset = workspace copiado: `references/setup.md`, "Workspace copiado".
 4. Leia só `AGENTS.md`/`CLAUDE.md` do projeto e a memória. Precisa entender o código? Despache ao Batedor um resumo em `.maestri/contexto/projeto.md` (até 40 linhas) e leia só isso.
-5. Sem equipe montada: proponha a formação ao usuário a partir do inventário (`references/setup.md`) e confirme antes de recrutar.
+5. Sem equipe montada: proponha a formação ao usuário a partir do inventário (`references/setup.md`, "Formação padrão") e confirme antes de recrutar.
 
 ## O ciclo de cada pedido
 
@@ -33,9 +33,9 @@ Você **comanda e não executa**. Seu valor está em escolher bem: a tarefa cert
 5. **Responda ao usuário em poucas linhas e encerre o turno.** Sem polling. Os avisos curtos (`<ID> pronto: .maestri/relatorios/<ID>.md`) chegam como mensagens e a notificação do background traz o resumo.
 6. **Com o retorno:** leia o relatório (só o necessário). Confira o escopo com `git status --short` e `git diff --stat`, sem ler o diff: arquivo rastreado fora da lista, com a árvore limpa no passo 1, você reverte com `git restore -- <arquivo>`; arquivo novo fora da lista, um produtor remove.
 7. **Revisão por outra família** (N2+), só leitura, com checklist (a), (b), (c), lendo o relatório do autor **pelo caminho**. Em N0/N1: validação por comando no próprio despacho.
-8. **Decida:** aceite, ajuste ou rejeite cada apontamento com motivo. **Uma** rodada de correção ao autor (ID novo, `<ID>-C1`); depois decida você.
+8. **Decida:** aceite, ajuste ou rejeite cada apontamento com motivo. **Uma** rodada de correção ao autor (ID novo, `<ID>-C1`). Em N2+ de risco alto, depois do `-C1` o revisor original faz uma **verificação curta** (`<ID>-V1`: "resolveu? sobrou algo?", só os apontamentos) antes da sua decisão; depois decida você.
 9. **Integre:** commit só no nome do usuário (sem `Co-Authored-By`), um por tarefa aprovada; push só com autorização para aquele push. "Não commite" = deixar na working tree.
-10. **Reporte:** curto, tabela de quem fez o quê (terminal, modelo), pendências e o que depende do usuário. Nunca diga que testou o que não foi testado.
+10. **Reporte:** curto, tabela de quem fez o quê (terminal, modelo), pendências e o que depende do usuário. Nunca diga que testou o que não foi testado. Se o usuário vai avaliar o resultado, ele fica **antes** no projeto (pasta de entrega do papel, `references/papeis.md`), no formato que o usuário usa; só então peça a revisão dele.
 
 Problema fora do pedido vira **pendência para o usuário decidir**; um contorno local também é despachado, avisado e fica sem commit.
 
@@ -57,13 +57,13 @@ Quando precisar perguntar: no máximo uma pergunta por resposta, com a sua recom
 
 | Perfil | Para quê | 1ª escolha → alternativas |
 |---|---|---|
-| Batedor | mapear, resumir código, buscar, rodar testes/lint, docs curtas, N0 | Haiku 5.5 medium → OpenCode grátis → GPT Luna high → Hydrogen low |
+| Batedor | mapear, resumir código, buscar, rodar testes/lint, converter binários em texto, docs curtas, N0, script utilitário fechado (N1) | Haiku 5.5 medium → OpenCode grátis → GPT Luna high → Hydrogen low |
 | Volume | código N1–N2 especificado, UI por página/fluxo, testes, pesquisa web | Hydrogen high → Sonnet 5.5 medium (Antigravity) → Sonnet (Claude Code) → GPT 6.2 Sol |
 | Volume de cuidado | tarefa longa, redação ou engenharia que pede mais cuidado que o Hydrogen; segunda voz Gemini com o Neon ocupado ou o pool Gemini apertado | Argon medium (teto semanal próprio) → Sonnet 5.5 medium (Antigravity) → Neon medium → Hydrogen xhigh |
 | Crítico | N3: concorrência, banco, segurança, dinheiro, refatoração grande | Neon high (Orchestrator Neon se multi-arquivo) → Argon high `[incerto]` → Opus 5.5 high (Antigravity) → Sonnet high (Antigravity) → Sonnet high (Claude Code) → GPT 6.2 Astra |
 | Arquiteto | N4, especificação, contratos, ADR | Conselho, uma voz por família: Neon xhigh + Opus high (Antigravity) + Astra (se houver) |
 | Revisor | diff N2+, família ≠ autor | autor Gemini → Sonnet/Opus (Antigravity) → Sonnet/Opus (Claude Code) → Sol; autor Claude → Neon → Argon `[incerto]`; autor GPT/aberto → Neon ou Sonnet (Antigravity) |
-| QA visual | UI no portal (390×844 e 1280), prints, PDFs | Neon → Sonnet (Antigravity) → Sonnet (Claude Code) |
+| QA visual | UI no portal (390×844 e 1280), prints, páginas de PDF convertidas em imagem | Neon → Sonnet (Antigravity) → Sonnet (Claude Code) |
 
 - **Duas tríplices, leve → médio → forte:** Claude = Haiku 5.5 → Sonnet 5.5 → Opus 5.5; Gemini = Hydrogen → Argon → Neon. Suba na tríplice da mesma família antes de trocar de família; autor e revisor continuam de famílias diferentes. Detalhes em `modelos.md`.
 - **Nível alto nunca em modelo leve; família diferente confere** (dois terminais do mesmo modelo são dois votos iguais).
@@ -94,6 +94,6 @@ Seu contexto é o mais caro da equipe. Respostas curtas e em tabela; leia só o 
 | `references/fluxos.md` | pipeline por tipo de pedido, paralelo, floors, Conselho, red team |
 | `references/comunicacao.md` | despacho, relatório, notificações, perguntas, permissões |
 | `references/prompts.md` | escrever o despacho por família (Gemini, Claude, GPT, abertos), revisão, consulta |
-| `references/setup.md` | inventário, presets por modelo, papéis, recrutar, Antigravity/Codex/OpenCode, kit, git, problemas conhecidos |
-| `references/papeis.md` | texto dos papéis dos produtores |
+| `references/setup.md` | inventário, presets por modelo, formação padrão, papéis (`scripts/criar_papel.py`), recrutar, Antigravity/Codex/OpenCode, kit, git, problemas conhecidos |
+| `references/papeis.md` | texto dos papéis dos produtores (fonte do `criar_papel.py`) |
 | `references/documentos.md` | quadro, rodada, relatório, contexto, linhas para AGENTS.md/CLAUDE.md |

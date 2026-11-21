@@ -41,6 +41,7 @@ Todos participam, mas **ninguém é chamado por chamar**: uma etapa só existe s
 ## Padrões de colaboração
 
 - **Par autor + revisor (N2+):** o despacho do autor já diz quem revisa; o revisor recebe o caminho do relatório do autor e um checklist (a), (b), (c). No máximo **uma** rodada de correção; depois o Maestro decide.
+- **Verificação pós-correção (N2+ de risco alto):** depois do `<ID>-C1`, o revisor original faz uma verificação curta (`<ID>-V1`, só leitura): "cada apontamento aceito foi resolvido? sobrou ou nasceu algo?". Devolve aprovado ou só o que restou, e o Maestro decide. Não é segunda rodada de correção: se sobrar algo, o Maestro decide (aceita, ajusta ou pendência para o usuário). Em risco baixo, a conferência do Maestro por `git diff --stat` basta.
 - **Teste por terceiro (N3):** só com especificação executável. Ordem: interfaces e stubs → testes (falham) → implementação.
 - **Red team:** só quando o cartão marca risco (segurança, dinheiro, dado pessoal). Ataca quem não escreveu o código.
 - **Conselho (N4):** mesma pergunta para todos, cada um com um ângulo, sem ver as respostas dos outros. Visões próximas (mesma família) pesam como uma.

@@ -60,6 +60,8 @@ Com base apenas nos arquivos acima, <repita a acao em uma frase>.
 
 Multi-arquivo no Antigravity: prefira o Orchestrator (planeja e executa) ou peça `/plan` antes de editar.
 
+Despacho Gemini só com **caminhos legíveis**: texto ou imagem. Binário (PDF, Office, zip...) vira texto antes, por um terminal Claude Code (`roteamento.md`), e o despacho cita o arquivo convertido. Script de verificação e listagem de pastas fora da pasta de papel: o sandbox pode bloquear; no "Valide" do despacho Gemini ponha só comando simples e despache a checagem por script a outro terminal.
+
 ## 2. Claude (Claude Code e Claude no Antigravity: Haiku, Sonnet, Opus, Fable)
 
 Regras: texto direto; "funcionário brilhante, mas novo": o agente só tem o prompt. Documento longo: a pergunta vai no fim. Peça **conferência contra os critérios antes de terminar**. Haiku: passos numerados e escopo bem fechado (em low ele pula checagens). Sonnet/Opus: objetivo e critérios, caminho livre dentro do escopo. Fable: menos prescrição (prompt prescritivo demais piora).
@@ -130,3 +132,5 @@ Mesmo erro 2x: pare e reporte. SOMENTE LEITURA: nao edite nem crie arquivos (so 
 ```
 
 **Rodada de correção** (volta ao autor, uma vez só, com ID novo `<ID>-C1`): os apontamentos aceitos, numerados; o escopo permitido repetido; mesmo critério de pronto.
+
+**Verificação curta** (N2+ de risco alto, ao revisor original, ID `<ID>-V1`, SOMENTE LEITURA): caminho do relatório do `-C1` e os apontamentos aceitos, numerados. Pergunta: "cada um foi resolvido? sobrou ou nasceu algo?". Resposta: aprovado, ou só o que restou (arquivo, trecho, problema). Até 10 linhas.

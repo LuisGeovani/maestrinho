@@ -40,14 +40,46 @@ maestri preset create "Haiku" --command "claude --model haiku --effort medium --
 - **Produtor Claude: padrão = Agy Sonnet / Agy Opus** (Antigravity, pool "Claude and GPT"). Os presets Sonnet / Sonnet High (Claude Code, cota Pro dividida com o Maestro) são **reserva**: só quando o pool Claude do Antigravity esgotar (`cotas.py` com 5h ou semanal ≥ 100%) ou a tarefa precisar de algo que só o Claude Code faz fora do sandbox do Antigravity (rede local/SSH sem autorização, git/gh, escrita fora do workspace); volte ao Antigravity quando a cota voltar. Ao propor a formação, ponha Agy Sonnet/Agy Opus nos produtores Claude. Haiku segue como está.
 - `../../..` só vale com `--role`. Sem papel, o agente abre na pasta do workspace: use `--dir <RAIZ>` e nenhum `--add-dir`.
 - Presets antigos com caminho de projeto fixo continuam funcionando, mas pare de criar novos; prefira os genéricos. Use nomes que não colidam com presets antigos (ex.: "Haiku" em vez de um "Claude Haiku" que já aponta para outro projeto).
+- **Preset com caminho fixo:** o `inventario.py` lista, uma linha por preset, os que têm `--add-dir`/`--dir` com caminho absoluto (ou do diretório pessoal), que quase sempre é de outro projeto. Corrija com `maestri preset set "<Nome>" --command "<comando genérico da tabela acima>"` (ou crie o genérico e apague o antigo) e reabra os terminais que o usam com `recruit --replace`. `--dir <RAIZ>` de um preset sem papel é uso legítimo: o aviso só pede que você confirme que a pasta é deste projeto.
 - Presets de produtor podem ficar fora do Quick Start (`--quick-start off`): quem os usa é o Maestro. O Quick Start tem limite; se estiver cheio, o preset novo não aparece lá, mas funciona no `--preset`.
 - Para variar um effort só uma vez, `recruit` aceita `--command` junto com `--preset` (o preset dá o tipo e o ícone): `maestri recruit "Nome" --preset "Claude Code" --command "claude --model haiku --effort low --add-dir ../../.." --role "Papel"`.
 - IDs de modelo mudam: confira no `inventario.py` (para o Antigravity, `agy models`) antes de criar.
 - Nunca `--dangerously-skip-permissions` (agy) nem `--yolo` (codex) num preset de produtor.
 
+### Formação padrão (o que propor ao usuário)
+
+Uma vaga por degrau das duas tríplices (`modelos.md`). Proponha, confirme e anote em `.maestri/equipe.md`. Efforts: `roteamento.md` §3. O effort da vaga é o do preset; para uma tarefa mais leve (ex.: Argon medium), use `recruit --command` (acima) em vez de outro preset.
+
+**Com os dois planos (Claude e Gemini):** seis vagas.
+
+| Vaga | Preset | Função típica |
+|---|---|---|
+| Haiku medium | "Haiku" | Batedor: mapear, resumir, rodar testes/lint, converter binários em texto, script utilitário fechado |
+| Sonnet medium | "Agy Sonnet" | produção cuidadosa Claude; revisor de autor Gemini; QA visual com olho de design |
+| Opus high | "Agy Opus" | Arquiteto e Crítico N3/N4; voz Claude do Conselho |
+| Hydrogen high | "Agy Hydrogen" | Volume: código e UI especificados, em lote, pesquisa web |
+| Argon (preset high; medium via `--command`) | "Agy Argon" | Volume de cuidado: tarefa longa, redação ou engenharia; segunda voz Gemini (teto semanal próprio) |
+| Neon high | "Agy Neon" | Crítico N3; revisor de autor Claude; QA visual; multimodal |
+
+**Com um plano só:** três vagas, um terminal por degrau da tríplice disponível (Haiku, Sonnet, Opus; ou Hydrogen, Argon, Neon), com o leve fazendo Batedor e Volume. Acrescente o OpenCode grátis como Batedor de outra família, se instalado (nunca com código sensível). Sem outra família para conferir, avise o usuário em uma linha: o revisor será outro degrau da mesma família, voto menos independente que o de outra.
+
+Terminais extras (Codex, Orchestrator Neon, segundo Hydrogen) só quando a cota e o volume pedem; ninguém é recrutado por recrutar.
+
 ## 3. Papéis
 
 Papéis são do workspace atual. Modelos em `papeis.md`. Dois terminais com o **mesmo papel compartilham a mesma pasta de papel**; isso funciona, mas um papel por terminal deixa cada um com sua identidade.
+
+Monte o papel com o script (monta o texto a partir dos blocos de `papeis.md`, sem copiar o texto para o script):
+
+```
+python <SKILL>/scripts/criar_papel.py "<Nome>" --projeto "<Projeto>" --raiz "<RAIZ>" --modelo "<Modelo>" --effort <e> --familia <Claude|Gemini|GPT|aberto> --perfis "<Batedor,Volume,...>" [--pastas "..."] [--entrega "<pasta>"] [--ferramenta agy|codex|opencode] [--aplicar]
+```
+
+- Grava `<RAIZ>/.maestri/papeis/<Nome>.md` (UTF-8 sem BOM). Sem `--aplicar`, só grava e mostra o resumo; revise e rode de novo com `--aplicar`.
+- `--aplicar` roda `maestri role create`, ou `maestri role write` se o `role show` achar o papel (só no terminal Maestro). Perfis: os nomes das linhas de perfil de `papeis.md`. Sem `--pastas`: "as do despacho"; sem `--entrega`: "nenhuma". `--ferramenta` junta o bloco do Antigravity, Codex ou OpenCode.
+- Os campos de caminho (`<RAIZ>`, `--pastas`, `--entrega`) vão com barras normais (o CLI decodifica `\n` e `\t` nos argumentos). Depois do `--aplicar` o script confere com `role show` e avisa (saída 3) se o texto ficou truncado.
+
+À mão (ajustes e papéis fora do padrão):
 
 ```
 maestri role create "Nome do papel" "<texto>"
@@ -86,6 +118,7 @@ Não crie band sem o usuário pedir, e não conecte produtores entre si: tudo pa
 - O papel do Antigravity leva o bloco "Antigravity" de `papeis.md` (se der access denied, rode SOMENTE o comando maestri fora do sandbox).
 - O agy abre em modo `auto` (edições e comandos seguros aprovados). Ao lançar modelo novo, aparece um banner "Introducing …"; ele some sozinho com o primeiro prompt.
 - Skills globais do agy: `~/.gemini/config/skills/` (também lê `~/.gemini/skills/`).
+- **Limites do sandbox:** o `read_file` do agy **recusa arquivos binários** (PDF, Office, zip...) e o sandbox bloqueia rodar scripts e listar pastas fora da pasta de papel. Efeito já visto: tarefa bloqueada e checagem que não rodou. Regra: converta o binário para texto num terminal Claude Code **antes** de despachar ao Antigravity, e rode scripts de verificação **fora** dele (Claude Code, Codex ou OpenCode). Texto e imagem o agy lê. Detalhe em `roteamento.md` e `prompts.md` §1.
 
 ## 6. Codex
 
@@ -125,7 +158,7 @@ Gera `maestro/settings.gerado.json` (hook que bloqueia ferramentas de trabalho) 
 
 ## Workspace copiado de outro projeto
 
-Sintoma: papéis citando outro projeto, presets com `--add-dir` de outra pasta, rodapé com caminho antigo. Correção (com ok do usuário): um Batedor reescreve os papéis a partir de `papeis.md` em `.maestri/papeis/`; o Maestro aplica com `maestri role write`; troque os presets por modelo (seção 2) e reabra cada terminal com `recruit --replace`.
+Sintoma: papéis citando outro projeto, presets com `--add-dir` de outra pasta, rodapé com caminho antigo. Correção (com ok do usuário): o Maestro refaz cada papel com `scripts/criar_papel.py ... --aplicar` (ele usa `role write` nos que já existem); troque os presets por modelo (seção 2) e reabra cada terminal com `recruit --replace`.
 
 ## Problemas conhecidos
 
@@ -144,6 +177,7 @@ Sintoma: papéis citando outro projeto, presets com `--add-dir` de outra pasta, 
 | Terminal voltou ao shell após atualização | a ferramenta fechou ao atualizar | `recruit --replace` |
 | Classificador do Claude Code bloqueia `recruit --replace`, `git commit` ou push do Maestro | ação sensível no modo automático | explicar ao usuário e pedir que aprove ou rode |
 | Pergunta ao usuário some ou é respondida sozinha | aviso de produtor digitado em cima do diálogo | sem AskUserQuestion com tarefa em andamento |
+| Terminal Antigravity bloqueado ao ler PDF/Office/zip ou ao rodar script de checagem | `read_file` recusa binário e o sandbox bloqueia scripts (seção 5) | converta o binário para texto num terminal Claude Code antes de despachar; rode a checagem em outro terminal |
 | Banner "Introducing …" no Antigravity | novidade de modelo | some com o primeiro prompt; não precisa de ação |
 | Produtor reporta despacho "truncado" ou o texto fica na caixa de entrada | despacho enviado enquanto o terminal abria | usar `maestri_batch.py` (espera o terminal ficar pronto e recupera o texto parado); com `maestri ask` direto, espere o prompt aparecer no `check` |
 | Relatório ou pesquisa vira instrução de projeto de repente | no Windows (e no macOS padrão) `claude.md` = `CLAUDE.md`, `agents.md` = `AGENTS.md`, `gemini.md` = `GEMINI.md`: as ferramentas carregam o arquivo como regra | nunca dê esses nomes a relatórios, pesquisas ou notas (use `anthropic.md`, `pesquisa-claude.md`...) |

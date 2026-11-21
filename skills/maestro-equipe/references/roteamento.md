@@ -10,10 +10,12 @@ Objetivo: cada tarefa no modelo **mais barato que resolve**, com o effort certo,
 | Nível | Exemplos | Revisão |
 |---|---|---|
 | N0 trivial | typo, renomear, config de uma linha, rodar um comando | validação por comando no próprio despacho (grep, build); sem revisor |
-| N1 simples | README, fixture, script pequeno, componente simples | validação por comando; revisor de outra família só se tocar lógica ou UI |
+| N1 simples | README, fixture, script pequeno ou utilitário fechado, componente simples | validação por comando; revisor de outra família só se tocar lógica ou UI |
 | N2 médio | tela, endpoint CRUD, migração simples, refatoração local | revisor de outra família (+ QA visual se for UI) |
 | N3 complexo | concorrência, idempotência, segurança, dinheiro, dados pessoais, consulta pesada, refatoração ampla | especificação executável + testes por uma família, implementação por outra, revisão (+ red team se houver risco) |
 | N4 crítico | stack, modelo de dados, arquitetura, custo | Conselho (uma voz por família, só leitura) → o usuário decide → ADR |
+
+- **Script utilitário fechado é N1 e cabe no Haiku:** especificação (entrada → saída) e teste definidos no despacho. Se o despacho autoriza explicitamente, o produtor faz; recusa por "passar de N1" só vale quando falta especificação ou teste.
 
 3. **Risco:** segurança, dinheiro, dado pessoal → sobe um nível e pede red team em N3.
 4. **Tamanho e dependência:** quantos arquivos? Depende de outra tarefa? **Cadeia dependente fica no mesmo terminal**; só tarefas independentes vão em paralelo para terminais diferentes (multi-agente custa ~15x os tokens de um chat e só compensa em trabalho independente).
@@ -24,13 +26,13 @@ A equipe é montada com o que o inventário achar (`scripts/inventario.py`). Cad
 
 | Perfil | Para quê | 1ª escolha → alternativas |
 |---|---|---|
-| **Batedor** | mapear arquivos e estado, resumir código para o Maestro, busca, inventário, rodar testes/lint/build, docs curtas, N0, consolidar pesquisas | Haiku 5.5 medium → OpenCode grátis (`deepseek-v4.1-flash-free`) → GPT Luna high → Hydrogen low |
+| **Batedor** | mapear arquivos e estado, resumir código para o Maestro, busca, inventário, rodar testes/lint/build, converter binários em texto, docs curtas, N0, script utilitário fechado, consolidar pesquisas | Haiku 5.5 medium → OpenCode grátis (`deepseek-v4.1-flash-free`) → GPT Luna high → Hydrogen low |
 | **Volume** | código N1–N2 bem especificado, UI em lotes por página ou fluxo, escrever testes, pesquisa web | Hydrogen high → Sonnet 5.5 medium no Antigravity → Sonnet 5.5 medium no Claude Code → GPT 6.2 Sol medium |
 | **Volume de cuidado** | tarefa longa, redação ou engenharia que pede mais cuidado que o Hydrogen; segunda voz Gemini quando o Neon está ocupado ou o pool Gemini principal está apertado (Argon tem teto semanal próprio) | Argon medium (high se difícil) → Sonnet 5.5 medium no Antigravity → Neon medium → Hydrogen xhigh |
 | **Crítico** | N3: concorrência, banco, segurança, lógica de dinheiro, refatoração grande | Neon high (Orchestrator Neon se for multi-arquivo) → Argon high `[incerto]` → Opus 5.5 high no Antigravity → Sonnet 5.5 high no Antigravity → Sonnet 5.5 high no Claude Code → GPT 6.2 Astra high |
 | **Arquiteto** | N4, especificação executável, contratos, ADR, desempate | Conselho com uma voz por família: Neon xhigh + Opus 5.5 high (Antigravity) + GPT 6.2 Astra high (se houver) + Fable 5.2 high (se o plano tiver) |
 | **Revisor** | revisão de diff N2+, sempre de família **diferente** do autor | autor Gemini → Sonnet 5.5 (medium; high em N3) ou Opus no Antigravity → os mesmos no Claude Code → GPT 6.2 Sol; autor Claude → Neon high → Argon high `[incerto]`; autor GPT ou aberto → Neon ou Sonnet (Antigravity) |
-| **QA visual** | conferir UI pelo portal (390×844 e 1280), prints, PDFs, gráficos | Neon high → Sonnet 5.5 medium no Antigravity (olho de design) → Sonnet 5.5 medium no Claude Code |
+| **QA visual** | conferir UI pelo portal (390×844 e 1280), prints, páginas de PDF convertidas em imagem, gráficos | Neon high → Sonnet 5.5 medium no Antigravity (olho de design) → Sonnet 5.5 medium no Claude Code |
 
 Regras de ouro do roteamento:
 - **Nível alto nunca em modelo leve.** Batedor não faz lógica N2+.
@@ -38,6 +40,7 @@ Regras de ouro do roteamento:
 - **Tríplices por família** (`modelos.md`): Claude Haiku → Sonnet → Opus; Gemini Hydrogen → Argon → Neon. Cada degrau tem seu custo e sua cota: leve para volume e checagem, médio para produção cuidadosa, forte para N3/N4 e revisão.
 - **Volume vai para o pool abundante:** Hydrogen e OpenCode grátis antes de gastar Claude Pro ou Codex.
 - **Claude nos produtores: PRIMEIRO o Antigravity, SÓ DEPOIS o Claude Code.** Sonnet e Opus rodam nos presets Agy Sonnet / Agy Opus (pool "Claude and GPT"); o Claude Code (cota Pro dividida com o Maestro) é reserva. Exceções: pool Claude do Antigravity esgotado (`cotas.py` com 5h ou semanal ≥ 100%) ou tarefa que precisa de algo que só o Claude Code faz fora do sandbox do Antigravity (rede local/SSH sem autorização, git/gh, escrita fora do workspace); nesses casos use Claude Code e volte ao Antigravity quando a cota voltar. Haiku segue como está.
+- **Antigravity não lê binário e o sandbox bloqueia scripts** (`setup.md` §5). Insumo binário (PDF, Office, zip...) é convertido para texto por um terminal Claude Code **antes** de despachar ao Antigravity, e o despacho cita só o texto. Script de verificação (checador, build, teste) roda fora do Antigravity: Claude Code, Codex ou OpenCode.
 - **GPT entra quando há cota.** No plano Free, só Luna para checagens curtas; com Plus, Sol revisa e Astra opina em N4.
 - **Dado sensível** (código fechado de cliente, segredos, dados pessoais) nunca vai para modelo grátis que treina com os dados (Big Pickle, Iceman, Flint, Inkling).
 

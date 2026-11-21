@@ -12,7 +12,7 @@ Nomes e IDs mudam rápido. Antes de criar presets, confira com `python <skill>/s
 | Gemini | **Hydrogen** ($1,50/$7,50): código e texto bem especificados, lote | **Argon**: tarefa longa, redação/engenharia que pede mais cuidado que o Hydrogen | **Neon** ($3/$15): N3, revisão, QA visual, multimodal |
 
 - Cota: Haiku/Sonnet/Opus no Antigravity = pool "Claude and GPT" (Claude Code só como reserva); Hydrogen e Neon = pool "Gemini Models" (5 h + semanal); **Argon = teto semanal próprio no Pro, não gasta o pool Gemini principal**. Custo relativo: Haiku < Sonnet < Opus; Hydrogen < Neon, com o Argon no meio `[incerto]` (preço de API do Argon não confirmado).
-- Qualidade relativa Argon × Neon (e Argon × Sonnet) **não medida** `[incerto]`: o catálogo lista o Neon acima; o Argon está em teste no projeto Mais Gestão. Em N3+ sem medida, prefira o Neon; o Argon é alternativa.
+- Qualidade relativa Argon × Neon (e Argon × Sonnet) **não medida** `[incerto]`: o catálogo lista o Neon acima; o Argon ainda está em teste. Em N3+ sem medida, prefira o Neon; o Argon é alternativa.
 
 ## Claude (Opus e Sonnet: PRIMEIRO no Antigravity, pool "Claude and GPT"; SÓ DEPOIS no Claude Code)
 
