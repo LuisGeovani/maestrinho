@@ -64,6 +64,8 @@ Despacho Gemini só com **caminhos legíveis**: texto ou imagem. Use Gemini 3.8 
 
 ## 2. Claude (Claude Code e Claude no Antigravity: Haiku, Sonnet, Opus, Fable)
 
+Escolhida Claude, aplique a ordem Antigravity → Claude Code de `roteamento.md` §4. Registre no despacho o modelo e o effort do terminal efetivo.
+
 Regras: texto direto; "funcionário brilhante, mas novo": o agente só tem o prompt. Documento longo: a pergunta vai no fim. Peça **conferência contra os critérios antes de terminar**. Haiku: passos numerados e escopo bem fechado (em low ele pula checagens). Sonnet/Opus: objetivo e critérios, caminho livre dentro do escopo. Fable: menos prescrição (prompt prescritivo demais piora).
 
 ```

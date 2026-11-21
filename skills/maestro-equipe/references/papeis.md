@@ -14,6 +14,8 @@ Você é <NOME>, produtor da equipe do projeto <PROJETO> no Maestri. Você roda 
 + bloco da ferramenta (Antigravity, Codex ou OpenCode, se for o caso)
 ```
 
+Ao montar um papel Sonnet ou Opus, use primeiro Antigravity quando Claude for a família escolhida. Se a cota de "Claude and GPT" bloquear o despacho, use o mesmo modelo e perfil no Claude Code com Pro utilizável. Volte ao Antigravity no reset (veja `roteamento.md` §4).
+
 `<ENTREGA>` = a pasta do projeto, fora de `.maestri/`, onde fica o resultado que o usuário vai avaliar (ex.: `<RAIZ>/entrega`), ou "nenhuma" se o usuário não avalia arquivos. É o único lugar fora das pastas do despacho em que o bloco comum autoriza gravar, e só quando o despacho mandar.
 
 `criar_papel.py --perfis` aceita os sete **perfis de papel** listados abaixo. A matriz de `roteamento.md` detalha **tipos de tarefa** dentro desses perfis.

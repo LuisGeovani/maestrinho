@@ -10,7 +10,7 @@ Nomes e IDs mudam rápido. Antes de criar presets, confira com `python <skill>/s
 |---|---|---|---|
 | Claude | **Haiku 5.5** | Batedor, conversão de binário, abertura de URL e verificação com shell e prova bruta | lógica N2+ e tarefas que outro pool elegível cobre |
 | | **Sonnet 5.5** | produção cuidadosa, revisão de outra família, verificação com shell no Claude Code | volume que cabe no Hydrogen ou no Sol |
-| | **Opus 5.5** | redação de registro formal, N3/N4, voz Claude no Conselho | rotina e uso do Claude Pro fora da regra de reserva |
+| | **Opus 5.5** | redação de registro formal, N3/N4, voz Claude no Conselho | rotina e uso do Claude Pro fora das condições de `roteamento.md` §4 |
 | Gemini | **Gemini 3.8 Flash** | triagem e classificação N0 de texto já convertido | agente de terminal, código e verificação de fonte/fato |
 | | **Hydrogen** | código e UI bem especificados em lote, pesquisa ampla | escopo vago e verificação de fonte/fato |
 | | **Argon** | tarefa longa, redação ou engenharia cuidadosa, diff curto | N3 decisivo |
@@ -22,13 +22,13 @@ Nomes e IDs mudam rápido. Antes de criar presets, confira com `python <skill>/s
 | Abertos | **OpenCode grátis** (ex.: `deepseek-v4.1-flash-free`) | Batedor de custo zero: leitura, resumo, testes com saída verificável | agente longo e código em modelo que treina com os dados |
 | | **OpenCode pago** (quando contratado) | implementação média com um modelo disponível e adequado ao perfil | assumir equivalência ou cota com base só no provedor |
 
-Os abertos são a quarta família para roteamento. O catálogo de OpenCode abaixo detalha as opções. O pool "Claude and GPT" do Antigravity atende Agy Sonnet e Agy Opus. Hydrogen e Neon usam "Gemini Models", Argon tem teto semanal próprio e os quatro GPT compartilham o medidor Codex. Para o Gemini 3.8 Flash, confirme o medidor no ambiente [incerto].
+Os abertos são a quarta família para roteamento. O catálogo de OpenCode abaixo detalha as opções. O pool "Claude and GPT" do Antigravity atende Agy Sonnet e Agy Opus. Hydrogen e Neon usam "Gemini Models", Argon tem teto semanal próprio e os quatro GPT compartilham o medidor Codex. O Gemini 3.8 Flash tem medidor desconhecido até confirmação do vínculo no provedor. Só use a folga de "Gemini Models" para ele se esse vínculo for confirmado.
 
 A qualidade relativa de Argon × Neon e Argon × Sonnet segue sem medida [incerto]. Em N3 decisivo, prefira Neon. Veja a matriz e as regras de cota em `roteamento.md`.
 
 ## Claude (Opus e Sonnet: PRIMEIRO no Antigravity, pool "Claude and GPT"; SÓ DEPOIS no Claude Code)
 
-Para produtores Sonnet/Opus, use primeiro Agy Sonnet / Agy Opus. O Claude Pro é reserva do Maestro: só use um produtor no Claude Code quando a tarefa ficar sem outro terminal elegível e a reserva permitir, inclusive para Haiku. A matriz em `roteamento.md` especifica quando o esgotamento do pool "Claude and GPT" habilita Opus no Claude Code.
+Compare a folga entre famílias igualmente aptas antes da escolha. Escolhida Claude, use Agy Sonnet / Agy Opus no medidor "Claude and GPT". Se esse medidor bloquear por cota, passe ao Claude Code com Pro utilizável (janelas conhecidas < 95%, sem veto) e volte ao Antigravity no reset. A matriz de `roteamento.md` também indica tarefas Claude que exigem shell no Claude Code.
 
 | Modelo | Bom em | Evite | Effort |
 |---|---|---|---|
@@ -38,7 +38,7 @@ Para produtores Sonnet/Opus, use primeiro Agy Sonnet / Agy Opus. O Claude Pro é
 | **Haiku 5.5** ($0,10/$0,50 até 100K de prompt) | exploração, busca, extração, resumo de código para o Maestro, config repetitiva, lote, checagens com saída verificável | lógica N2+, prompt acima de 100K (preço 5x), instrução longa em low (pula checagens) | medium; low em lote trivial; high em instrução rígida e longa |
 
 - Claude Code: `--model haiku|sonnet|opus|fable` e `--effort low|medium|high|xhigh|max`. O padrão do Claude Code é medium para os quatro; declare sempre.
-- Anthropic mediu: Opus orquestrando Sonnet ≈ 1/3 mais barato com a mesma nota; Fable orquestrando, 19% mais caro sem ganho; trabalhadores Haiku −32% de custo e −4 pts. Por isso o Maestro roda Opus, e Haiku entra como Batedor de reserva quando a tarefa exige Claude Code e a reserva do Claude Pro permite.
+- Anthropic mediu: Opus orquestrando Sonnet ≈ 1/3 mais barato com a mesma nota; Fable orquestrando, 19% mais caro sem ganho; trabalhadores Haiku −32% de custo e −4 pts. Por isso o Maestro roda Opus, e Haiku entra como Batedor em tarefas compatíveis no Claude Code com Pro utilizável.
 - Plano: Pro e Max dividem 5 h + semanal entre o chat e o Claude Code (e com o Maestro). Max = 5x Pro; Ultra (ex-Max 20x) = 10x Pro por semana.
 
 ## Gemini (Antigravity `agy`; pool "Gemini Models" 5 h + semanal; Argon tem teto semanal próprio no Pro)
@@ -54,7 +54,7 @@ IDs = `<modelo>-<effort>` (ex.: `gemini-4-neon-high`). Effort maior gasta mais c
 | **Gemini 4 Argon** (30/09/2026) | **modelo principal de nível médio** da escada Gemini: tarefa longa e de redação/engenharia que pede mais cuidado que o Hydrogen, refatoração ampla, segunda voz Gemini com o Neon ocupado; AA 50, DeepSWE 77,9%, multimodal denso (LVBench 91,7%); **teto semanal próprio** (não gasta o pool Gemini principal) | N3 de risco alto e revisão decisiva (o Neon supera o Argon em qualidade `[incerto]`); volume trivial (gasta o teto à toa) | medium; high no difícil; low só em trivial |
 | **Gemini 3.8 Flash** | triagem e classificação N0 de texto já convertido; disponível em todos os planos | agente de terminal (TB 4.1 18%), código e verificação de fonte/fato | low/medium |
 | **Gemini 4 Carbon** | o mais forte para tarefas longas | só Ultra/Enterprise (aparece "Unavailable" no Pro); lento | medium |
-| **Claude Opus 5.5 / Sonnet 5.5 no agy** | os mesmos modelos da Anthropic **sem gastar o Claude Pro** (pool "Claude and GPT"); **1ª escolha** para produtor Claude, antes do Claude Code | — | até high |
+| **Claude Opus 5.5 / Sonnet 5.5 no agy** | os mesmos modelos da Anthropic **sem gastar o Claude Pro** (pool "Claude and GPT"); **1ª escolha dentro da família Claude**, antes do Claude Code | — | até high |
 | **GPT-OSS 120B** | — | sendo removido ("Notice", 18/11/2026) | não rotear |
 
 - Prompt: XML ou Markdown, contexto primeiro, restrições e formato no fim; não pedir "pense passo a passo" (o thinking é nativo); escopo fechado (ver `prompts.md`).

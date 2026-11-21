@@ -24,7 +24,8 @@ Presets são **globais** (valem em todos os workspaces). Não grave o caminho do
 | Haiku | `claude --model haiku --effort medium --add-dir ../../..` |
 | Sonnet | `claude --model sonnet --effort medium --add-dir ../../..` |
 | Sonnet High | `claude --model sonnet --effort high --add-dir ../../..` |
-| Agy Flash | `agy --model gemini-3.8-flash --add-dir ../../..` (triagem N0; confirme o ID e prefira low quando oferecido em `agy models`) |
+| Opus High | `claude --model opus --effort high --add-dir ../../..` |
+| Agy Flash | `agy --model gemini-3.8-flash --add-dir ../../..` (triagem N0, medidor desconhecido até confirmação no provedor; confirme o ID e prefira low quando oferecido em `agy models`) |
 | Agy Hydrogen | `agy --model gemini-4-hydrogen-high --add-dir ../../..` |
 | Agy Argon | `agy --model gemini-4-argon-high --add-dir ../../..` |
 | Agy Neon | `agy --model gemini-4-neon-high --add-dir ../../..` |
@@ -41,7 +42,7 @@ Presets são **globais** (valem em todos os workspaces). Não grave o caminho do
 maestri preset create "Haiku" --command "claude --model haiku --effort medium --add-dir ../../.." --quick-start off
 ```
 
-- **Produtor Claude: Agy Sonnet / Agy Opus primeiro** (Antigravity, pool "Claude and GPT"). O Claude Pro é reserva do Maestro. Sonnet, Sonnet High e Haiku no Claude Code seguem as regras de elegibilidade de `roteamento.md` §4.
+- **Família Claude:** escolha a família pela folga entre famílias igualmente aptas. Depois use Agy Sonnet / Agy Opus primeiro no medidor "Claude and GPT". Quando ele bloquear por cota, use Sonnet, Sonnet High ou Opus High no Claude Code com Pro utilizável, mesmo com outros pools livres. Volte ao Antigravity no reset. Para shell, use Claude Code conforme a matriz. Veja `roteamento.md` §4.
 - `../../..` só vale com `--role`. Sem papel, o agente abre na pasta do workspace: use `--dir <RAIZ>` e nenhum `--add-dir`.
 - Presets antigos com caminho de projeto fixo continuam funcionando, mas pare de criar novos; prefira os genéricos. Use nomes que não colidam com presets antigos (ex.: "Haiku" em vez de um "Claude Haiku" que já aponta para outro projeto).
 - **Preset com caminho fixo:** o `inventario.py` lista, uma linha por preset, os que têm `--add-dir`/`--dir` com caminho absoluto (ou do diretório pessoal), que quase sempre é de outro projeto. Corrija com `maestri preset set "<Nome>" --command "<comando genérico da tabela acima>"` (ou crie o genérico e apague o antigo) e reabra os terminais que o usam com `recruit --replace`. `--dir <RAIZ>` de um preset sem papel é uso legítimo: o aviso só pede que você confirme que a pasta é deste projeto.
@@ -67,9 +68,9 @@ Proponha, confirme e anote em `.maestri/equipe.md` uma vaga por degrau ativo. Ef
 | Neon high | Agy Neon | Crítico, Revisor e QA visual. Xhigh para o Conselho |
 | OpenCode grátis (opcional) | OpenCode Gratis | Batedor de leitura, triagem e comandos pequenos quando o preset estiver disponível |
 
-**Sob demanda:** recrute ou use `recruit --replace` entre tarefas para Astra (N3/N4 e Conselho), Terra (escrita, resumo, formato) ou Gemini 3.8 Flash (triagem textual N0). Haiku no Claude Code só entra se a reserva permitir. Orchestrator Neon e terminais extras entram conforme o volume e a cota.
+**Sob demanda:** recrute ou use `recruit --replace` entre tarefas para Astra (N3/N4 e Conselho), Terra (escrita, resumo, formato) ou Gemini 3.8 Flash (triagem textual N0). Haiku no Claude Code entra nos perfis que a matriz indica, com Pro utilizável. Orchestrator Neon e terminais extras entram conforme o volume e a cota.
 
-**Com menos planos:** monte a equipe com os degraus disponíveis que a demanda pede. Aplique a reserva do Claude Pro mesmo na formação reduzida. Acrescente OpenCode grátis quando houver tarefa compatível. Se faltar outra família qualificada para revisar, avise o usuário e registre a revisão como pendente.
+**Com menos planos:** monte a equipe com os degraus disponíveis que a demanda pede. Aplique a ordem interna Claude e os limites de despacho mesmo na formação reduzida. Acrescente OpenCode grátis quando houver tarefa compatível. Se faltar outra família qualificada para revisar, avise o usuário e registre a revisão como pendente.
 
 ## 3. Papéis
 
@@ -161,7 +162,8 @@ Gera `maestro/settings.gerado.json` (hook que bloqueia ferramentas de trabalho) 
 
 - `.gitignore` com `.maestri/` (papéis, despachos, relatórios, contexto), `node_modules`, builds, `.env*` (menos `!.env.example`) e `.worktrees/`; quem edita é um produtor.
 - Commits pequenos, só no nome do usuário. Push e PR só com autorização explícita para aquele push.
-- Repositório compartilhado: não commite em `develop`/`main`; o trabalho de outra pessoa é a referência; antes de descartar algo, `git diff --stat`, patch no `.maestri/` e `stash` como backup; `git pull --ff-only`; trazer arquivos de outra branch sem commit: `git restore --source=<ref> --worktree -- <pasta>`; reescrita de histórico só com confirmação e `--force-with-lease`.
+- Em repositório compartilhado, preserve alterações fora do escopo do despacho. Confira os caminhos contra todos os despachos ativos e identifique o responsável. Peça autorização explícita do usuário antes de descartar. Após a autorização, confira com `git diff --stat` e faça backup da alteração afetada antes do descarte.
+- Em repositório compartilhado, não commite em `develop`/`main` e use `git pull --ff-only`. Para trazer arquivos de outra branch sem commit, use `git restore --source=<ref> --worktree -- <pasta>`. Reescrita de histórico exige confirmação e `--force-with-lease`.
 
 ## Workspace copiado de outro projeto
 

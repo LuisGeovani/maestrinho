@@ -21,17 +21,18 @@ Todos participam, mas **ninguém é chamado por chamar**: uma etapa só existe s
 
 | Pedido | Etapas (perfil · exemplo de modelo) |
 |---|---|
-| **Feature N2** | Mapear (Batedor · OpenCode grátis para leitura) → Implementar (Volume · Hydrogen high ou Sol medium, conforme a folga) → Revisar (Sol high se o autor for Gemini, Neon high se for GPT) → 1 rodada de correção → Integrar |
+| **Feature N2** | Mapear (Batedor · OpenCode grátis para leitura) → Implementar (Volume · Hydrogen high ou Sol medium, conforme a folga) → Revisar (outra família, pela folga entre candidatos que cumprem o mesmo checklist) → 1 rodada de correção → Integrar |
 | **Bug** | Mapear + reproduzir (Batedor) → Corrigir + teste de regressão (Volume, ou Crítico se N3) → Revisar (outra família) |
-| **N3 crítico** | Especificar (Arquiteto · Agy Opus) → Testes (família A · Sol medium com shell) → Implementar (família B · Neon high) → Red team se houver risco (terceira família elegível quando possível) → Revisar |
-| **UI** | Implementar por página ou fluxo (Volume · Hydrogen) → QA visual (Neon high) → Revisar código (Sol high se o autor for Gemini) |
-| **Refatoração ampla** | Mapear → Orchestrator Neon (planeja e executa) ou Crítico → testes existentes rodados pelo Batedor → Revisar (Sol high se o autor for Gemini) |
-| **Pesquisa** | 2–3 famílias em paralelo, cada uma com fontes ou ângulo próprio, só leitura → Verificar fonte/fato com Sol, Sonnet 5.5 ou Haiku 5.5 em terminal com shell e prova bruta → Consolidar (Batedor) → o Maestro lê só o consolidado |
-| **Decisão N4** | Conselho em paralelo, só leitura (Neon xhigh, Astra high e Agy Opus conforme a matriz e a cota, uma voz por família) → o Maestro sintetiza consensos, divergências e recomendação → o usuário decide → Batedor registra o ADR com as visões vencidas |
+| **N3 crítico** | Especificar (Arquiteto · Opus pela ordem Claude) → Testes (família A · Sol medium com shell) → Implementar (família B · Neon high) → Red team se houver risco (terceira família elegível quando possível) → Revisar |
+| **UI** | Implementar por página ou fluxo (Volume de código, pela folga) → QA visual (pela matriz) → Revisar código (outra família, pela matriz) |
+| **Refatoração ampla** | Mapear → Orchestrator Neon (planeja e executa) ou Crítico → testes existentes rodados pelo Batedor → Revisar (outra família, pela matriz) |
+| **Pergunta de fonte única** | Um terminal elegível com shell, Sol por padrão. Na mesma tarefa, abre a fonte e entrega a resposta com prova bruta (comando e saída, código HTTP e trecho literal) |
+| **Pesquisa ampla** | 2–3 famílias em paralelo, cada uma com fontes ou ângulo próprio, só leitura → Verificar fonte/fato com Sol, Sonnet 5.5 ou Haiku 5.5 em terminal com shell e prova bruta → Consolidar (Batedor) → o Maestro lê só o consolidado |
+| **Decisão N4** | Conselho em paralelo, só leitura (Neon xhigh, Astra high e Opus pela ordem Claude da matriz, uma voz por família) → o Maestro sintetiza consensos, divergências e recomendação → o usuário decide → Batedor registra o ADR com as visões vencidas |
 | **Docs ou config N0–N1** | Batedor faz + grep de validação no próprio despacho. Em N1 com lógica ou UI, também há revisão cruzada |
 | **Entender o projeto** (sessão nova, código desconhecido) | Batedor gera um resumo de até 40 linhas em `.maestri/contexto/projeto.md`; o Maestro lê só isso |
 
-Aplique a matriz de `roteamento.md` para escolher o terminal e a família de cada etapa. Separe a pesquisa ampla da verificação de fonte/fato. Prepare binários e execute scripts que o sandbox bloqueia em terminais elegíveis com shell antes de repassar os resultados ao Antigravity.
+Aplique a matriz de `roteamento.md` para escolher o terminal e a família de cada etapa. Reserve o fluxo com 2–3 famílias para pesquisa ampla ou decisão. Na pesquisa ampla, encaminhe a verificação de fonte/fato conforme a matriz. Prepare binários e execute scripts que o sandbox bloqueia em terminais elegíveis com shell antes de repassar os resultados ao Antigravity.
 
 ## Paralelo, dependência e arquivos compartilhados
 
