@@ -125,6 +125,20 @@ def sem_heredoc(cmd):
     return "\n".join(saida)
 
 
+ATRIBUICAO = re.compile(r"""(?:^|[;&|\n])[ \t]*([A-Za-z_]\w*)=(?:"([^"$`]*)"|'([^']*)'|([^\s;&|$`"'()]+))""")
+
+
+def expandir_variaveis(cmd):
+    """Resolve $VAR e ${VAR} atribuídas com valor literal no próprio comando (S="/x/a.py"; python "$S").
+    Sem isso, o guarda não saberia que script ou pasta o comando usa. Valor com $ ou crase não conta."""
+    valores = {}
+    for m in ATRIBUICAO.finditer(cmd):
+        valores[m.group(1)] = next(g for g in m.groups()[1:] if g is not None)
+    if not valores:
+        return cmd
+    return re.sub(r"\$(?:\{(\w+)\}|(\w+))", lambda m: valores.get(m.group(1) or m.group(2), m.group(0)), cmd)
+
+
 def tokens(cmd):
     # barra invertida de caminho do Windows vira /, sem mexer em \" e \\
     cmd = re.sub(r"\\(?=[\w .:\-])", "/", cmd)
@@ -206,6 +220,8 @@ def checar_segmento(seg, cwd):
 
 def checar_comando(cmd, cwd, shell="Bash"):
     cmd = sem_heredoc(cmd)
+    if shell == "Bash":
+        cmd = expandir_variaveis(cmd)
     internos = re.findall(r"\$\(([^()]*)\)", cmd)
     if shell == "Bash":
         internos += re.findall(r"`([^`]*)`", cmd)
@@ -276,6 +292,13 @@ CASOS = [
     ("Bash", "git log -p -3", False),
     ("Bash", f'python "{SCRIPTS / "maestri_batch.py"}" - <<\'EOF\'\n### Prisma | T1\nrode npm run build; sed -i x\nEOF', True),
     ("Bash", f'python "{SCRIPTS / "cotas.py"}"', True),
+    ("Bash", f'python "{SCRIPTS / "criar_papel.py"}" "Faísca" --projeto P --raiz "C:/proj" --modelo M --effort high --familia Gemini --perfis Volume --aplicar', True),
+    ("Bash", f'S="{SCRIPTS / "criar_papel.py"}"; python "$S" "Faísca" --projeto P', True),
+    ("Bash", f'S="{SCRIPTS / "inventario.py"}"\npython "${{S}}"', True),
+    ("Bash", 'S="src/x.py"; python "$S"', False),
+    ("Bash", 'R=src; mkdir -p "$R/x"', False),
+    ("Bash", 'S="$(pwd)/x.py"; python "$S"', False),
+    ("Write", ".maestri/papeis/Faísca.md", True),
     ("Bash", "python -c \"open('x','w')\"", False),
     ("Bash", "npm run build", False),
     ("Bash", "cd app && npx vite build", False),
