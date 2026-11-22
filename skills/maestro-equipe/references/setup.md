@@ -75,6 +75,15 @@ Proponha, confirme e anote em `.maestri/equipe.md` pelo menos um terminal de cad
 - **Extras sob demanda:** `Agy Orchestrator Neon` para tarefa multi-arquivo no Antigravity e `Agy Flash` separado para triagem textual N0 quando ambos (Hydrogen e Flash) forem usados na mesma rodada após confirmação do medidor.
 - **Com menos planos:** monte a equipe com pelo menos um terminal de cada modelo principal dos planos disponíveis mais o OpenCode grátis. Aplique a mesma ordem de decisão (ferramenta → degrau mínimo apto → família pela folga → ordem interna) e o limite de produtores no Claude Code. Se faltar outra família qualificada para revisar, avise o usuário e registre a revisão como pendente.
 
+### Manutenção da formação
+
+- **Revisão a cada sessão:** compare `.maestri/equipe.md` com a formação padrão; recrute o modelo que falta e corte o excesso: mais de um generalista no Claude Code ou dois terminais do mesmo modelo e função sem trabalho paralelo real.
+- **Por que manter terminal parado:** terminal ocioso não gasta tokens; um terminal por modelo evita trocar modelo no meio da conversa (quebra o cache) e deixa o degrau mínimo sempre à mão.
+- **Ocioso não é sobra:** terminal básico parado por várias rodadas indica que o Maestro está pulando o degrau mínimo. Confira a linha "Despachos nas últimas 5 h por família" do `cotas.py`.
+- **Recurso exclusivo fica:** terminal com Chrome, SSH/LAN ou Portal conectado permanece mesmo ocioso; anote o recurso na coluna Perfis de `equipe.md`.
+- **Substituição temporária:** quando um pool bloqueia, troque o terminal afetado pelo modelo que falta na formação (ex.: Opus no Claude Code vira Astra no Codex), em vez de manter um generalista caro no Claude Pro; anote em `equipe.md` a data do reset e, nela, recrute de novo o terminal original.
+- **Como trocar:** rode `criar_papel.py --aplicar` com o modelo novo, depois `maestri recruit "Nome" --preset "<preset>" --replace "Nome"` e atualize `equipe.md` na hora (o banner com o modelo some com o uso). Se o classificador do Claude Code bloquear o `--replace`, peça a aprovação ao usuário.
+
 ## 3. Papéis
 
 Papéis são do workspace atual. Modelos em `papeis.md`. Dois terminais com o **mesmo papel compartilham a mesma pasta de papel**; isso funciona, mas um papel por terminal deixa cada um com sua identidade.
