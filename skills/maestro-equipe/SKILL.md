@@ -11,9 +11,9 @@ Você **comanda e não executa**. Seu valor está em escolher bem: a tarefa cert
 
 ## Princípios de roteamento
 
-1. **Ferramenta → nível → cota.** Binários, abertura direta de URL e scripts bloqueados pelo sandbox vão para Codex, Claude Code ou OpenCode conforme a matriz. Antigravity recebe texto ou imagem já preparados.
-2. **Escolhida a família Claude, use Sonnet ou Opus no Antigravity (Claude and GPT).** Se a cota bloquear novos despachos, passe para Claude Code enquanto todas as janelas conhecidas do Pro estiverem abaixo de 95% e o provedor não vetar uso. Volte ao Antigravity no reset. Compare a folga entre famílias igualmente aptas antes da escolha.
-3. **Preserve o degrau exigido pelo perfil.** Entre famílias que entregam o mesmo aceite, escolha pela folga depois das reservas. Mantenha a preferência técnica nas tarefas especializadas.
+1. **Equilíbrio entre provedores.** Mantenha os pools pagos (Claude Pro, Codex, Gemini Models, Argon, Claude and GPT) em percentuais parecidos; nenhuma família é padrão. O Claude Pro carrega o Maestro: produtor no Claude Code só com (a) recurso exclusivo (`--chrome`; SSH/LAN exclusivo), (b) nenhum apto de outra família com folga, ou (c) pools comprovadamente equilibrados (pool desconhecido só avisa e passa; "trava não disparada" não prova equilíbrio) e Claude entre os aptos. Pergunta de controle: "antes de despachar para Claude: qual terminal GPT, Gemini ou aberto apto foi descartado, e por quê?" (vira `Motivo pool:` se a trava disparar).
+2. **Ordem de decisão: ferramenta (requisito duro) → degrau mínimo apto → família pela folga (equalizar) → ordem interna da família.** A família não é escolhida antes da comparação. Binários, URL direta e scripts bloqueados pelo sandbox vão para Codex, Claude Code ou OpenCode; Antigravity recebe texto ou imagem preparados. Ordem interna Claude: Antigravity (Claude and GPT) → Claude Code → volta ao Antigravity no reset; com o Claude and GPT bloqueado, Claude entra na comparação pela folga do Claude Pro (com o Maestro) e sujeito à trava.
+3. **Degrau mínimo apto.** Escolha o menor modelo que entrega o aceite de primeira e preserve o degrau do perfil. Scripts, edições mecânicas e checagens N0/N1 com passos fechados e teste automático vão primeiro ao Batedor (Luna, Hydrogen low/medium, Flash com medidor confirmado, OpenCode grátis; Haiku se o Pro não estiver retido). Separe partes mecânicas (levantar, contar, listar, converter, rodar testes, checklist mecânico) em N0/N1 para o degrau básico só quando poupar o modelo caro. Nunca invente tarefa nem mande N2+ ao básico ("barato não é economia se refaz").
 4. **Verificação exige prova bruta.** Registre comando e saída, com código HTTP e trecho literal quando verificar fonte. Fonte ou fato só com Sol, Sonnet ou Haiku em terminal com shell. Luna, Flash e Antigravity ficam fora dessa verificação. Sem prova, registre como pendente.
 
 ## Regra de ouro
@@ -35,14 +35,14 @@ Você **comanda e não executa**. Seu valor está em escolher bem: a tarefa cert
 
 1. **Estado** só com git e maestri (`git status --short`, `git log -3`, `git diff --stat`).
 2. **Quebre em tarefas** com ID (`<PREFIXO>-T<n>`): nível N0–N4, tipo de tarefa, terminal, **modelo e effort**, revisor de outra família, critério de pronto (`references/roteamento.md`). Escolha o pipeline do tipo de pedido (`references/fluxos.md`). Dependentes em sequência (mesmo terminal quando possível); independentes no mesmo lote.
-3. **Cota:** `python <SKILL>/scripts/cotas.py` antes de lotes e no início de cada rodada; aplique as [regras de cota](references/roteamento.md#4-consulte-a-cota-antes-de-decidir) para escolher o pool e reservar o lote.
+3. **Cota:** `python <SKILL>/scripts/cotas.py` antes de lotes e no início de cada rodada; aplique as [regras de cota](references/roteamento.md#4-consulte-a-cota-antes-de-decidir) para escolher o pool, reservar o lote e conferir a distribuição do lote e eventuais retenções (`RETIDO (equilíbrio)`, [`comunicacao.md` §2](references/comunicacao.md#2-despachar)).
 4. **Despache** com `scripts/maestri_batch.py` **em background** (`references/comunicacao.md`): despacho em `.maestri/despachos/<rodada>.md`, seções `### <Terminal> | <ID>`, prompt no formato da família do destinatário (`references/prompts.md`). O script espera o terminal ficar pronto, acrescenta o rodapé de relatório com o seu nome real e confere tudo.
 5. **Responda ao usuário em poucas linhas e encerre o turno.** Sem polling. Os avisos curtos (`<ID> pronto: .maestri/relatorios/<ID>.md`) chegam como mensagens e a notificação do background traz o resumo.
-6. **Com o retorno:** leia o necessário do relatório e confira o escopo com `git status --short` e `git diff --stat`. Se aparecer arquivo fora da lista do despacho, preserve a alteração, rastreada ou nova. Compare o caminho com o escopo de todos os despachos ativos, identifique o responsável e peça autorização explícita ao usuário antes de descartar. Siga `references/setup.md` §9.
+6. **Com o retorno:** leia o necessário do relatório e confira o escopo (`git status --short`, `git diff --stat`). Falhou ou voltou `parcial`: não reenvie antes de um diagnóstico (o que já foi feito, a causa da falha e o que falta, de preferência por Batedor do degrau básico lendo relatório, tela ou log); só então reencaminhe o restante. Arquivo fora do despacho: preserve, identifique o responsável entre os despachos ativos e peça autorização antes de descartar (`references/setup.md` §9).
 7. **Revisão por outra família** (N2+), só leitura, com checklist (a), (b), (c), lendo o relatório do autor **pelo caminho**. Em N0/N1: validação por comando no próprio despacho. Em N1 com lógica ou UI, também peça revisão cruzada.
 8. **Decida:** aceite, ajuste ou rejeite cada apontamento com motivo. **Uma** rodada de correção ao autor (ID novo, `<ID>-C1`). Em N2+ de risco alto, depois do `-C1` o revisor original faz uma **verificação curta** (`<ID>-V1`: "resolveu? sobrou algo?", só os apontamentos) antes da sua decisão; depois decida você.
 9. **Integre:** commit só no nome do usuário (sem `Co-Authored-By`), um por tarefa aprovada; push só com autorização para aquele push. "Não commite" = deixar na working tree.
-10. **Reporte:** curto, tabela de quem fez o quê (terminal, modelo), pendências e o que depende do usuário. Nunca diga que testou o que não foi testado. Se o usuário vai avaliar o resultado, ele fica **antes** no projeto (pasta de entrega do papel, `references/papeis.md`), no formato que o usuário usa; só então peça a revisão dele.
+10. **Reporte:** curto, tabela de quem fez o quê (terminal, modelo), cotas e distribuição por família ao lado das cotas, pendências e o que depende do usuário. Nunca diga que testou o que não foi testado. Se o usuário vai avaliar o resultado, ele fica **antes** no projeto (pasta de entrega do papel, `references/papeis.md`), no formato que o usuário usa; só então peça a revisão dele.
 
 Problema fora do pedido vira **pendência para o usuário decidir**; um contorno local também é despachado, avisado e fica sem commit.
 
@@ -62,28 +62,27 @@ Quando precisar perguntar: no máximo uma pergunta por resposta, com a sua recom
 
 ## Roteamento rápido (detalhes em `references/roteamento.md` e `references/modelos.md`)
 
-**↔** indica candidatos para o mesmo aceite. Entre famílias igualmente aptas, use a maior folga após as reservas e então aplique a ordem interna da família. **→** indica preferência técnica ou recurso de reserva. Confira as condições na matriz.
+**↔** liga candidatos aptos em pé de igualdade: filtre pela ferramenta, escolha o degrau mínimo apto, compare a folga entre famílias para equalizar os pools pagos e aplique a ordem interna da família. **→** indica preferência técnica com condição própria ([matriz e trava em `roteamento.md` §2 e §4](references/roteamento.md#2-escolha-o-modelo-pelo-tipo-de-tarefa)).
 
-| Tipo de tarefa | Opções para o mesmo aceite ou preferência técnica |
+| Tipo de tarefa | Opções em pé de igualdade (↔) ou preferência técnica (→) |
 |---|---|
-| Batedor: script, checagem, comando | Luna high ↔ OpenCode grátis para passos e teste fechados. Hydrogen low só para comando compatível com Antigravity. Haiku 5.5 medium no Claude Code para shell, se o Pro estiver utilizável |
-| Batedor: leitura e triagem | OpenCode grátis ↔ Terra low. Em texto N0, Gemini 3.8 Flash low entra após confirmação do medidor |
-| Converter binário / abrir URL | Sol low ↔ Luna high ↔ OpenCode grátis se tiverem a ferramenta e atenderem à mesma extração. Haiku 5.5 medium no Claude Code se a família Claude for escolhida e o Pro estiver utilizável. Para verificar fonte, use a linha própria |
-| Volume: código | Hydrogen high ↔ Sol medium. Claude também entra quando cumpre o mesmo aceite: Agy Sonnet → Sonnet 5.5 medium [Pro] pela regra Claude |
-| Volume: texto/pesquisa | Texto → Terra medium ↔ Sol medium ↔ Argon medium. Pesquisa ampla → Hydrogen high ↔ Sol medium ↔ Argon medium, conforme acesso |
-| Volume de cuidado | Argon medium ↔ Sol high ↔ Sonnet pela regra Claude ↔ Neon medium quando cumprirem o mesmo aceite |
-| Redação de registro formal | Agy Opus → Opus 5.5 no Claude Code pela regra Claude. Argon/Sol após A/B aprovado |
-| Verificação de fonte/fato | Sol medium → Sonnet 5.5 ou Haiku 5.5 no Claude Code com Pro utilizável |
-| Crítico | Neon high (Orchestrator Neon se couber) → Astra high → Opus pela regra Claude → Sol high |
-| Arquiteto / Conselho | Neon xhigh + Astra high + Agy Opus. Voz Claude segue a regra Antigravity → Claude Code |
-| Revisor | Família ≠ autor. Diff curto de baixo risco → Neon high ↔ Argon medium se ambos forem elegíveis. Confira Sol e Sonnet na matriz. Para N3, siga a preferência técnica |
-| Revisão de texto | Família ≠ autor. Autor Gemini → Sol medium ↔ Sonnet pela regra Claude. Autor Claude, GPT ou aberto → Neon medium ↔ Argon medium |
-| QA visual | Neon high ↔ Sonnet pela regra Claude com o mesmo acesso e aceite. Terra medium para imagens fornecidas se equivalência confirmada |
+| Batedor: script, checagem, comando | Luna high ↔ OpenCode grátis ↔ Hydrogen low/medium (comandos compatíveis com Antigravity) ↔ Haiku 5.5 medium (Pro não retido) |
+| Batedor: leitura e triagem | OpenCode grátis ↔ Terra low ↔ Hydrogen low ↔ Gemini 3.8 Flash low (texto N0, após medidor confirmado) ↔ Haiku 5.5 low/medium (Pro não retido) |
+| Converter binário / abrir URL | Luna high ↔ OpenCode grátis ↔ Sol low ↔ Haiku 5.5 medium (Pro não retido), com a ferramenta exigida. Para verificar fonte, use a linha própria |
+| Navegador / site | (a) CLI ou API com shell (`gh` para PR/issue/checks, CLI de deploy) no menor degrau apto → (b) Portal do Maestri (Gemini ou GPT) → (c) Claude Code `--chrome` só se exigir sessão logada no Chrome do usuário (`Motivo pool: recurso exclusivo: Chrome` se a trava disparar) |
+| Volume: código | Hydrogen medium/high ↔ Sol low/medium ↔ Sonnet 5.5 medium (código N1–N2 que exige degrau intermediário; N0/N1 mecânico com passos fechados fica no Batedor) |
+| Volume: texto/pesquisa | Texto → Terra medium ↔ Argon medium ↔ Sol medium ↔ Sonnet 5.5 medium. Pesquisa ampla → Hydrogen high ↔ Sol medium ↔ Argon medium |
+| Volume de cuidado | Argon medium/high ↔ Sol high ↔ Neon medium ↔ Sonnet 5.5 medium/high |
+| Redação de registro formal | Opus 5.5 high (Agy Opus → Claude Code) → Argon high ↔ Sol high após A/B aprovado |
+| Verificação de fonte/fato | Sol medium ↔ Haiku 5.5 medium ↔ Sonnet 5.5 medium em terminal com shell e prova bruta |
+| Crítico | Neon high (ou Orchestrator Neon) ↔ Astra high ↔ Opus 5.5 high ↔ Sol high |
+| Arquiteto / Conselho | Conselho (uma voz por família): Neon xhigh + Astra high + Opus 5.5 high. Especificação N3: Neon high/xhigh ↔ Astra high ↔ Opus 5.5 high |
+| Revisor | Família ≠ autor: Neon high ↔ Argon medium (diff curto) ↔ Sol high ↔ Astra high (N3) ↔ Sonnet 5.5 medium/high. Claude não é revisor padrão; entra quando autor ≠ Claude e o equilíbrio permite |
+| Revisão de texto | Família ≠ autor: Neon medium ↔ Argon medium ↔ Sol medium ↔ Terra medium ↔ Sonnet 5.5 medium (quando autor ≠ Claude e o equilíbrio permite) |
+| QA visual | Neon high ↔ Argon high ↔ Terra medium (imagens fornecidas) ↔ Sonnet 5.5 medium |
 
-- **O Maestro também usa o Claude Pro.** Acompanhe a janela de 5 h ao passar tarefas Claude para o Claude Code. Uma vez escolhida Claude, cota livre em Codex ou Gemini não altera a passagem.
-- **Modelo e effort em todo despacho.** Troque entre tarefas. Falhou 2x: sobe effort → modelo → nível.
-- **Toda tarefa tem entregável verificável.** Paralelo só em trabalho independente (multi-agente custa ~15x tokens).
-- Código sensível nunca vai para modelo grátis que treina com os dados.
+- **Escolha do Maestro × trava ([`roteamento.md` §4](references/roteamento.md#4-consulte-a-cota-antes-de-decidir), [`comunicacao.md` §2](references/comunicacao.md#2-despachar)).** O Maestro escolhe entre os aptos pela folga; já o `maestri_batch.py` compara cada destino pago com leitura confiável (Claude, GPT ou Gemini) contra o menor uso global entre pools pagos elegíveis (`ready`, leitura fresca, sem veto) na janela mais apertada e marca `RETIDO (equilíbrio)` com ≥ 15 pp, salvo linha iniciada por `Motivo pool:` seguido de texto na mesma linha (sem diferenciar maiúsculas; ex.: `recurso exclusivo: qual` ou `sem alternativa: por quê`). OpenCode grátis nunca é retido; pool desconhecido ou desatualizado só avisa e passa.
+- **Todo despacho traz modelo, effort e entregável verificável.** Troque entre tarefas. Falha ou parcial: diagnóstico antes de retentar (2x: sobe effort → modelo → nível). Paralelo só em trabalho independente (~15x tokens). Código sensível nunca vai para modelo grátis que treina com os dados.
 
 ## Comunicação (o essencial; o resto em `references/comunicacao.md`)
 

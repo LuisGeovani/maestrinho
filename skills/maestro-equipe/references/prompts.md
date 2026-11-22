@@ -64,7 +64,7 @@ Despacho Gemini só com **caminhos legíveis**: texto ou imagem. Use Gemini 3.8 
 
 ## 2. Claude (Claude Code e Claude no Antigravity: Haiku, Sonnet, Opus, Fable)
 
-Escolhida Claude, aplique a ordem Antigravity → Claude Code de `roteamento.md` §4. Registre no despacho o modelo e o effort do terminal efetivo.
+Aplique a ordem de decisão de `roteamento.md`: ferramenta (requisito duro) → degrau mínimo apto → família pela folga (equalizar) → ordem interna da família (Antigravity → Claude Code → volta ao Antigravity no reset). A família não é escolhida antes da comparação: com o Claude and GPT do Antigravity bloqueado (ou quando a tarefa exige shell/`--chrome`), os candidatos Claude entram na comparação pela folga do Claude Pro (que inclui o Maestro) e sujeitos à trava de `roteamento.md` §4. Antes de despachar para Claude, responda à pergunta de controle ("antes de despachar para Claude: qual terminal GPT, Gemini ou aberto apto foi descartado, e por quê?"); se a trava reter o destino (`RETIDO (equilíbrio)`), inclua na seção uma linha que começa com `Motivo pool:` seguido de texto na mesma linha (sem diferenciar maiúsculas; exemplos de redação: `recurso exclusivo: qual` ou `sem alternativa: por quê`). Registre no despacho o modelo e o effort do terminal efetivo.
 
 Regras: texto direto; "funcionário brilhante, mas novo": o agente só tem o prompt. Documento longo: a pergunta vai no fim. Peça **conferência contra os critérios antes de terminar**. Haiku: passos numerados e escopo bem fechado (em low ele pula checagens). Sonnet/Opus: objetivo e critérios, caminho livre dentro do escopo. Fable: menos prescrição (prompt prescritivo demais piora).
 

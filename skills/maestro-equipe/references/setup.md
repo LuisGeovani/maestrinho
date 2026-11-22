@@ -42,7 +42,7 @@ Presets são **globais** (valem em todos os workspaces). Não grave o caminho do
 maestri preset create "Haiku" --command "claude --model haiku --effort medium --add-dir ../../.." --quick-start off
 ```
 
-- **Família Claude:** escolha a família pela folga entre famílias igualmente aptas. Depois use Agy Sonnet / Agy Opus primeiro no medidor "Claude and GPT". Quando ele bloquear por cota, use Sonnet, Sonnet High ou Opus High no Claude Code com Pro utilizável, mesmo com outros pools livres. Volte ao Antigravity no reset. Para shell, use Claude Code conforme a matriz. Veja `roteamento.md` §4.
+- **Família Claude:** aplique a ordem de decisão de `roteamento.md` (ferramenta → degrau mínimo apto → família pela folga → ordem interna). Enquanto o medidor "Claude and GPT" estiver utilizável, Sonnet e Opus entram na comparação por ele (`Agy Sonnet` / `Agy Opus`). Quando ele bloquear por cota (ou quando a tarefa exigir shell ou `--chrome`), os candidatos Claude entram na comparação pela folga do Claude Pro utilizável junto com as outras famílias aptas, respeitando `roteamento.md` §4 e a trava de equilíbrio. Volte ao Antigravity no reset.
 - `../../..` só vale com `--role`. Sem papel, o agente abre na pasta do workspace: use `--dir <RAIZ>` e nenhum `--add-dir`.
 - Presets antigos com caminho de projeto fixo continuam funcionando, mas pare de criar novos; prefira os genéricos. Use nomes que não colidam com presets antigos (ex.: "Haiku" em vez de um "Claude Haiku" que já aponta para outro projeto).
 - **Preset com caminho fixo:** o `inventario.py` lista, uma linha por preset, os que têm `--add-dir`/`--dir` com caminho absoluto (ou do diretório pessoal), que quase sempre é de outro projeto. Corrija com `maestri preset set "<Nome>" --command "<comando genérico da tabela acima>"` (ou crie o genérico e apague o antigo) e reabra os terminais que o usam com `recruit --replace`. `--dir <RAIZ>` de um preset sem papel é uso legítimo: o aviso só pede que você confirme que a pasta é deste projeto.
@@ -53,24 +53,27 @@ maestri preset create "Haiku" --command "claude --model haiku --effort medium --
 
 ### Formação padrão (o que propor ao usuário)
 
-Proponha, confirme e anote em `.maestri/equipe.md` uma vaga por degrau ativo. Efforts em `roteamento.md` §3. Para variar o effort entre tarefas, use `recruit --command` com o preset.
+Proponha, confirme e anote em `.maestri/equipe.md` pelo menos um terminal de cada modelo principal (GPT: Luna, Terra, Sol, Astra; Claude: Haiku, Sonnet, Opus; Gemini: Hydrogen ou Flash, Argon, Neon; mais OpenCode grátis). Efforts em `roteamento.md` §3. Para variar o effort entre tarefas, use `recruit --command` com o preset.
 
-**Com três planos pagos (Claude, Gemini e Codex): 7 a 8 vagas de produção.** Sete vagas base e uma oitava se houver demanda por Batedor no OpenCode grátis.
+**Com três planos pagos (Claude, Gemini e Codex) + OpenCode grátis: 11 vagas padrão (pelo menos um terminal de cada modelo principal).**
 
-| Vaga | Preset | Função típica |
-|---|---|---|
-| Luna high | Codex Luna | Batedor: script utilitário, configuração e checagem fechada com teste automático |
-| Sol medium | Codex Sol | Volume de código e verificação de fonte/fato. High para revisão de autor Gemini e N3 conforme a matriz |
-| Sonnet 5.5 medium | Agy Sonnet | Produção cuidadosa, revisão de outra família conforme a matriz e QA visual |
-| Opus 5.5 high | Agy Opus | Redação de registro formal, Crítico N3 e voz Claude do Conselho |
-| Hydrogen high | Agy Hydrogen | Volume de código, UI especificada e pesquisa ampla |
-| Argon high (medium via `--command`) | Agy Argon | Volume de cuidado, com teto semanal próprio |
-| Neon high | Agy Neon | Crítico, Revisor e QA visual. Xhigh para o Conselho |
-| OpenCode grátis (opcional) | OpenCode Gratis | Batedor de leitura, triagem e comandos pequenos quando o preset estiver disponível |
+| Família | Vaga (modelo e effort base) | Preset | Função típica |
+|---|---|---|---|
+| GPT | Luna high | Codex Luna | Batedor N0–N1: script utilitário, configuração e checagem fechada com teste automático |
+| GPT | Terra medium (low em triagem via `--command`) | Codex Terra | Batedor de leitura/triagem, escrita rápida, resumo, conversão de formato e visão |
+| GPT | Sol medium (high em revisão/N3 via `--command`) | Codex Sol | Volume de código, verificação de fonte/fato com shell e revisão de outra família |
+| GPT | Astra high | Codex Astra | Crítico N3, testes em base existente e voz GPT no Conselho N4 |
+| Claude | Haiku 5.5 medium | Haiku | Batedor no Claude Code (shell, conversão, abertura de URL, verificação de fonte) quando o Pro não estiver retido |
+| Claude | Sonnet 5.5 medium | Agy Sonnet | Volume, Volume de cuidado, revisão quando autor ≠ Claude e o equilíbrio permite, QA visual (no Antigravity) |
+| Claude | Opus 5.5 high | Agy Opus | Redação de registro formal, Crítico N3 e voz Claude do Conselho N4 (no Antigravity) |
+| Gemini | Hydrogen high (low/medium em N0–N1 via `--command`) ou Flash low | Agy Hydrogen (ou Agy Flash após medidor confirmado) | Batedor N0–N1 compatível com Antigravity, Volume de código, UI especificada e pesquisa ampla |
+| Gemini | Argon high (medium via `--command`) | Agy Argon | Volume de cuidado e revisão de diff curto, com teto semanal próprio |
+| Gemini | Neon high (xhigh no Conselho via `--command`) | Agy Neon | Crítico N3, Revisor, QA visual e voz Gemini no Conselho N4 |
+| Abertos | OpenCode grátis | OpenCode Gratis | Batedor de custo zero: leitura, triagem, resumo e comandos/testes fechados |
 
-**Sob demanda:** recrute ou use `recruit --replace` entre tarefas para Astra (N3/N4 e Conselho), Terra (escrita, resumo, formato) ou Gemini 3.8 Flash (triagem textual N0). Haiku no Claude Code entra nos perfis que a matriz indica, com Pro utilizável. Orchestrator Neon e terminais extras entram conforme o volume e a cota.
-
-**Com menos planos:** monte a equipe com os degraus disponíveis que a demanda pede. Aplique a ordem interna Claude e os limites de despacho mesmo na formação reduzida. Acrescente OpenCode grátis quando houver tarefa compatível. Se faltar outra família qualificada para revisar, avise o usuário e registre a revisão como pendente.
+- **Onde rodam os modelos Claude e limite no Claude Code:** Sonnet e Opus preferem o Antigravity (`Agy Sonnet` e `Agy Opus`, pool "Claude and GPT"). No Claude Code ficam o **Haiku**, eventual terminal com `--chrome` (usado só quando o site exige a sessão logada no Chrome do usuário e nem CLI/API com shell nem o Portal do Maestri atendem) e **no máximo um produtor Claude Code generalista** enquanto o Claude and GPT do Antigravity estiver bloqueado (voltando ao Antigravity no reset).
+- **Extras sob demanda:** `Agy Orchestrator Neon` para tarefa multi-arquivo no Antigravity e `Agy Flash` separado para triagem textual N0 quando ambos (Hydrogen e Flash) forem usados na mesma rodada após confirmação do medidor.
+- **Com menos planos:** monte a equipe com pelo menos um terminal de cada modelo principal dos planos disponíveis mais o OpenCode grátis. Aplique a mesma ordem de decisão (ferramenta → degrau mínimo apto → família pela folga → ordem interna) e o limite de produtores no Claude Code. Se faltar outra família qualificada para revisar, avise o usuário e registre a revisão como pendente.
 
 ## 3. Papéis
 

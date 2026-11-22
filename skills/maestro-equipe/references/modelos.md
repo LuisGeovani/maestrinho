@@ -17,7 +17,7 @@ Nomes e IDs mudam rápido. Antes de criar presets, confira com `python <skill>/s
 | | **Neon** | N3, revisão de diff e de texto, QA visual, multimodal | trivial e xhigh sem necessidade |
 | GPT | **Luna** | script, configuração e checagem N0–N1 com passos fechados e teste automático obrigatório | engenharia aberta, redação e verificação de fonte/fato |
 | | **Terra** | escrita rápida, resumo, conversão de formato e visão | código difícil |
-| | **Sol** | padrão GPT: código por especificação, revisão de diff e verificação com shell e prova bruta | tarefa sem critério de aceite |
+| | **Sol** | degrau médio GPT: código por especificação, revisão de diff e verificação com shell e prova bruta | tarefa sem critério de aceite e N0–N1 que cabem em Luna ou Terra |
 | | **Astra** | N3/N4, testes focados em base existente e voz GPT no Conselho | rotina e lotes grandes |
 | Abertos | **OpenCode grátis** (ex.: `deepseek-v4.1-flash-free`) | Batedor de custo zero: leitura, resumo, testes com saída verificável | agente longo e código em modelo que treina com os dados |
 | | **OpenCode pago** (quando contratado) | implementação média com um modelo disponível e adequado ao perfil | assumir equivalência ou cota com base só no provedor |
@@ -28,7 +28,7 @@ A qualidade relativa de Argon × Neon e Argon × Sonnet segue sem medida [incert
 
 ## Claude (Opus e Sonnet: PRIMEIRO no Antigravity, pool "Claude and GPT"; SÓ DEPOIS no Claude Code)
 
-Compare a folga entre famílias igualmente aptas antes da escolha. Escolhida Claude, use Agy Sonnet / Agy Opus no medidor "Claude and GPT". Se esse medidor bloquear por cota, passe ao Claude Code com Pro utilizável (janelas conhecidas < 95%, sem veto) e volte ao Antigravity no reset. A matriz de `roteamento.md` também indica tarefas Claude que exigem shell no Claude Code.
+Nenhuma família é padrão: aplique ferramenta (requisito duro) → degrau mínimo apto → família pela folga (equalizar) → ordem interna da família. Na família Claude, use primeiro Agy Sonnet / Agy Opus no medidor "Claude and GPT". Com esse medidor bloqueado (ou quando a tarefa exigir shell/Chrome), os candidatos Claude entram na comparação pela folga do Claude Pro (que inclui o Maestro) e a trava de equilíbrio de `roteamento.md` §4 vale para eles; volte ao Antigravity no reset.
 
 | Modelo | Bom em | Evite | Effort |
 |---|---|---|---|
@@ -66,7 +66,7 @@ Versão vigente: **GPT-6.2** (17/11/2026). Efforts no Codex: `low`, `medium`, `h
 | Modelo | Bom em | Evite | Effort |
 |---|---|---|---|
 | **gpt-6.2-astra** ($8/$40) | N3/N4, código e testes focados em base existente; voz GPT no Conselho | rotina (Plus: só 6–50 msgs por 5 h) | high em N3/N4; xhigh só com ganho real |
-| **gpt-6.2-sol** ($2/$10) | padrão GPT: código por especificação, verificação com shell e **revisão de diff** (a 0,5 pt da Astra por ~1/5 do custo) | — | medium; high em revisão difícil |
+| **gpt-6.2-sol** ($2/$10) | degrau médio GPT: código por especificação, verificação com shell e **revisão de diff** (a 0,5 pt da Astra por ~1/5 do custo) | N0–N1 simples que cabem em Luna ou Terra | medium; high em revisão difícil |
 | **gpt-6.1-terra** ($1/$5) | escrita rápida, resumo, conversão de formato e visão | código difícil (TB 53%) | medium; low em triagem textual |
 | **gpt-6-luna** ($0,10/$0,50) | volume N0–N1: scripts, configs e checagens com passos fechados e teste automático obrigatório | engenharia aberta, redação e verificação de fonte/fato (alucinação 77%, TB 15%) | high para scripts; medium em N0 trivial |
 | gpt-5.6 sol/terra/luna | geração anterior (aparecem no plano Free) | — | — |
