@@ -36,9 +36,20 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
+from cotas import LOG_DISTRIBUICAO, formatar_distribuicao, ler_cotas
+from inventario import (
+    CLI_PRESET, MEDIDORES_GEMINI_CONHECIDOS, MODELO_PRESET,
+    comando_da_formacao, comando_preset, ferramenta_e_pool, rodar,
+)
+
 LIMITE_JSON = 24000
+LIMIAR_EQUILIBRIO = 15
+COLUNAS_CLI = ("ferramenta", "cli", "preset", "preset/modelo", "modelo", "pool")
+RE_PRESET_FORMACAO = re.compile(r"^(.+?)\s*\(preset\s+([^)+]+)(?:\s*\+\s*`--command\s+(.+?)`)?", re.I)
+RE_MOTIVO_POOL = re.compile(r"^Motivo pool:\s*(\S.*)", re.I)
 RE_SECAO = re.compile(r"^###\s+(.+?)\s*(?:\|\s*([A-Za-z0-9][\w.\-]*))?\s*$")
 RE_PERMISSAO = re.compile(
     r"(do you want to"
@@ -299,31 +310,136 @@ def ferramentas_list(texto):
     return ferramentas
 
 
-def ferramentas_formacao(raiz):
-    """Lê apenas a tabela da formação, quando houver nome e metadados de ferramenta."""
+def ler_formacao(raiz):
+    """Lê as linhas das tabelas que identificam terminais da formação."""
     try:
         texto = (raiz / ".maestri" / "equipe.md").read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError):
         return {}
-    ferramentas = {}
-    coluna_nome, colunas_cli = None, []
+    formacao = {}
+    coluna_nome, titulos = None, []
+    nomes = ("terminal", "agente", "nome", "produtor")
     for linha in texto.splitlines():
         if not linha.lstrip().startswith("|"):
-            coluna_nome, colunas_cli = None, []
+            coluna_nome = None
             continue
         campos = [c.strip(" *`\t") for c in linha.strip().strip("|").split("|")]
-        titulos = [c.casefold() for c in campos]
-        nomes = ("terminal", "agente", "nome", "produtor")
-        metadados = ("ferramenta", "cli", "preset", "preset/modelo", "modelo", "pool")
-        if any(c in titulos for c in nomes) and any(c in titulos for c in metadados):
+        chaves = [c.casefold() for c in campos]
+        if any(c in chaves for c in nomes) and any(c in chaves for c in COLUNAS_CLI):
+            titulos = chaves
             coluna_nome = next(titulos.index(c) for c in nomes if c in titulos)
-            colunas_cli = [titulos.index(c) for c in metadados if c in titulos]
-        elif coluna_nome is not None and coluna_nome < len(campos):
-            for i in colunas_cli:
-                if i < len(campos) and (cli := ferramenta(campos[i])):
-                    ferramentas[campos[coluna_nome]] = cli
-                    break
+        elif coluna_nome is not None and coluna_nome < len(campos) and not all(
+            re.fullmatch(r":?-+:?", c) for c in campos
+        ):
+            formacao[campos[coluna_nome]] = dict(zip(titulos, campos))
+    return formacao
+
+
+def ferramentas_formacao(raiz, formacao=None):
+    ferramentas = {}
+    if formacao is None:
+        formacao = ler_formacao(raiz)
+    for agente, linha in formacao.items():
+        for coluna in COLUNAS_CLI:
+            if cli := ferramenta(linha.get(coluna, "")):
+                ferramentas[agente] = cli
+                break
     return ferramentas
+
+
+def nome_pool(cota):
+    if cota["via_claude"] == "Claude Code" and cota["plano"]:
+        return f"Claude {cota['plano'].title()}"
+    if cota["via_claude"] == "Antigravity":
+        return "Claude and GPT models"
+    return cota["medidor"]
+
+
+def pool_do_destino(exe, linha, plano_claude, medidores, comandos):
+    achado = RE_PRESET_FORMACAO.match(linha.get("ferramenta", ""))
+    if not achado:
+        return "desconhecido", "desconhecido"
+    ferramenta_declarada, preset, comando_extra = achado.groups()
+    preset = preset.strip()
+    if comando_extra:
+        comando = comando_extra.strip().strip("'\"")
+    else:
+        if preset not in comandos:
+            detalhes, _ = rodar([exe, "preset", "show", preset], timeout=5) if exe else (None, None)
+            comandos[preset] = comando_preset(detalhes)
+        comando = comandos[preset]
+    if not CLI_PRESET.search(comando):
+        comando = comando_da_formacao(ferramenta_declarada, linha.get("modelo", ""), preset)
+    cli, pool = ferramenta_e_pool(comando, plano_claude, medidores)
+    if cli == "OpenCode":
+        return "aberto", pool if pool == "grátis" else "desconhecido"
+    if cli == "Codex":
+        return "GPT", pool
+    if cli == "Claude Code":
+        return "Claude", pool if plano_claude else "desconhecido"
+    if pool == "Claude and GPT models":
+        modelo = MODELO_PRESET.search(comando)
+        modelo = modelo.group(1).casefold() if modelo else ""
+        return ("Claude" if modelo.startswith("claude-") else "GPT"), pool
+    if cli == "Antigravity" and pool in medidores:
+        return "Gemini", pool
+    return "desconhecido", "desconhecido"
+
+
+def avaliar_equilibrio(exe, formacao, secoes, pools):
+    plano_claude = next((p["plano"].title() for p in pools
+                         if p["via_claude"] == "Claude Code" and p["plano"]), "")
+    medidores = dict.fromkeys(p["medidor"] for p in pools if p["provedor"].casefold() == "antigravity")
+    for medidor in MEDIDORES_GEMINI_CONHECIDOS:
+        if medidor.casefold() not in {m.casefold() for m in medidores}:
+            medidores[medidor] = None
+    por_pool = {nome_pool(p): p for p in pools}
+    menor = min((p for p in pools if p["estado"] == "ready" and p["uso_max"] is not None
+                 and not p["veto_despacho"] and nome_pool(p).casefold() not in ("grátis", "opencode")
+                 and p["provedor"].casefold() != "opencode"
+                 and p["plano"].casefold() not in ("free", "grátis", "gratis")),
+                key=lambda p: p["uso_max"], default=None)
+    comandos, aceitas, retencoes = {}, {}, []
+    for secao in secoes:
+        agente, ident = secao["agente"], secao["id"] or "-"
+        familia, pool = pool_do_destino(exe, formacao.get(agente, {}), plano_claude, medidores, comandos)
+        motivo = next((m.group(1).strip() for linha in secao["linhas"] if (m := RE_MOTIVO_POOL.match(linha))), None)
+        cota = por_pool.get(pool)
+        if pool == "desconhecido":
+            print(f"aviso: {agente} | {ident}: pool desconhecido")
+        elif pool != "grátis":
+            if not cota or cota["estado"] != "ready" or cota["uso_max"] is None:
+                print(f"aviso: {agente} | {ident}: {pool} sem leitura fresca ou verificável")
+            elif menor is None:
+                print(f"aviso: {agente} | {ident}: sem pool pago elegível para comparação")
+            elif cota["uso_max"] - menor["uso_max"] >= LIMIAR_EQUILIBRIO and motivo is None:
+                retencoes.append(
+                    f"RETIDO (equilíbrio): {agente} | {ident}: {pool} {round(cota['uso_max'])}% vs "
+                    f"{nome_pool(menor)} {round(menor['uso_max'])}%; reencaminhe ou justifique com 'Motivo pool:'"
+                )
+                continue
+        aceitas[agente] = (ident, familia, pool, motivo or "")
+    return aceitas, retencoes
+
+
+def imprimir_equilibrio(retencoes, distribuicao):
+    for retencao in retencoes:
+        print(retencao)
+    print("Distribuição do lote: " + formatar_distribuicao(dados[1] for dados in distribuicao))
+
+
+def registrar_envios(pasta, inicio, envios):
+    if not envios:
+        return
+    data = datetime.fromtimestamp(inicio, timezone.utc).isoformat()
+    try:
+        with (pasta / LOG_DISTRIBUICAO).open("ab", buffering=0) as log:
+            for agente, (ident, familia, pool, motivo) in envios.items():
+                campos = (data, ident, agente, familia, pool, motivo)
+                linha = "\t".join(c.replace("\t", " ").replace("\r", " ").replace("\n", " ") for c in campos)
+                log.write((linha + "\n").encode("utf-8"))
+    except OSError as exc:
+        print(f"aviso: não foi possível registrar os envios em {LOG_DISTRIBUICAO}: {exc}")
 
 
 def avisar_criterios(exe, agente, ident, corpo, cli, conectado):
@@ -498,7 +614,7 @@ def main() -> int:
     ap.add_argument("--raiz", help="raiz do projeto (padrão: topo do git ou pasta atual)")
     ap.add_argument("--maestro", help="nome do Maestro para o ask back (padrão: You: do maestri list)")
     ap.add_argument("--sem-rodape", action="store_true", help="não acrescenta o rodapé de relatório")
-    ap.add_argument("--mostrar", action="store_true", help="só mostra os prompts finais, sem enviar")
+    ap.add_argument("--mostrar", action="store_true", help="mostra os prompts que passariam pela trava, sem enviar")
     ap.add_argument("--linhas", type=int, default=8, help="linhas finais da tela quando não houve ask back")
     ap.add_argument("--timeout", type=int, default=45, help="minutos de espera por lote")
     ap.add_argument("--espera", type=int, default=30, help="minutos de espera pelo relatório de quem ainda não terminou")
@@ -547,13 +663,24 @@ def main() -> int:
     if not maestro:
         print("ERRO: não achei o seu nome em `maestri list` (seção You:). Passe --maestro \"Nome\".")
         return 2
+
+    formacao = ler_formacao(raiz)
+    try:
+        pools, avisos_cotas = ler_cotas()
+    except Exception as exc:
+        pools, avisos_cotas = [], [f"falha ao ler cotas: {exc}"]
+    for aviso in avisos_cotas:
+        print(f"aviso: {aviso}")
+    aceitas, retencoes = avaliar_equilibrio(exe, formacao, secoes, pools)
+    secoes = [s for s in secoes if s["agente"] in aceitas]
     if not args.mostrar:
         faltam = [s["agente"] for s in secoes if s["agente"] not in conectados]
         if faltam:
             print(f"ERRO: não conectados: {', '.join(faltam)}. Conectados: {', '.join(sorted(conectados)) or 'nenhum'}")
+            imprimir_equilibrio(retencoes, ())
             return 2
 
-    ferramentas = {**ferramentas_formacao(raiz), **ferramentas_list(listagem)}
+    ferramentas = {**ferramentas_formacao(raiz, formacao), **ferramentas_list(listagem)}
     prompts, ids = {}, {}
     for s in secoes:
         corpo = "\n".join(s["linhas"]).strip()
@@ -570,6 +697,7 @@ def main() -> int:
     if args.mostrar:
         for a, p in prompts.items():
             print(f"===== {a} ({len(p)} caracteres)\n{p}\n")
+        imprimir_equilibrio(retencoes, aceitas.values())
         return 0
 
     pasta.mkdir(parents=True, exist_ok=True)
@@ -589,6 +717,7 @@ def main() -> int:
         print(f"== {agente} ({ids[agente] or '-'}): NÃO ENVIADO, {motivo}")
         prompts.pop(agente)
     if not prompts:
+        imprimir_equilibrio(retencoes, ())
         return 1
     relatorios = {}
     if not args.sem_rodape:
@@ -606,9 +735,16 @@ def main() -> int:
     parados = [a for a, (out, err) in resultados.items()
                if err is None and not relatorio_novo(relatorios.get(a), inicio)
                and menciona_id(out, ids[a]) and texto_nao_enviado(out)]
+    enter_falhou = set()
     for a in parados:
         print(f"aviso: o despacho para {a} ficou na caixa de entrada sem envio; mandei Enter e estou esperando o relatório")
-        subprocess.run([exe, "ask", a, "--raw", "\\r"], capture_output=True, stdin=subprocess.DEVNULL)
+        p = subprocess.run([exe, "ask", a, "--raw", "\\r"], capture_output=True, stdin=subprocess.DEVNULL)
+        if p.returncode != 0:
+            enter_falhou.add(a)
+
+    envios = {a: aceitas[a] for a, (_, erro) in resultados.items()
+              if erro is None and a not in enter_falhou}
+    registrar_envios(pasta.parent, inicio, envios)
 
     # Quem ainda não gravou relatório pode estar trabalhando em silêncio ou parado num pedido
     # de permissão: uma espera só, com prazo global de --espera, cobre todos os pendentes.
@@ -626,7 +762,11 @@ def main() -> int:
         if sem_relatorio:
             print(f"aviso: sem relatório em {args.espera} min: {', '.join(sorted(sem_relatorio))}", flush=True)
 
-    falhou = bool(bloqueios)
+    confirmados_por_relatorio = {a: aceitas[a] for a, relatorio in relatorios.items()
+                                 if a not in envios and relatorio_novo(relatorio, inicio)}
+    registrar_envios(pasta.parent, inicio, confirmados_por_relatorio)
+    envios.update(confirmados_por_relatorio)
+    falhou = bool(bloqueios or retencoes)
     print(f"Maestro: {maestro} | relatórios em {pasta} | {round(time.time() - inicio)} s")
     for agente in prompts:
         out, err = resultados.get(agente, (None, "sem retorno"))
@@ -662,6 +802,7 @@ def main() -> int:
             print(f"== {agente} ({ident}): terminou sem relatório; últimas linhas:")
             print("\n".join("   " + l[:200] for l in cauda))
         falhou = falhou or not args.sem_rodape
+    imprimir_equilibrio(retencoes, envios.values())
     return 1 if falhou else 0
 
 

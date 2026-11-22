@@ -13,7 +13,7 @@ import json
 import math
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from heapq import nlargest
 from pathlib import Path
 
@@ -21,6 +21,8 @@ JANELAS = {18000: "5h", 604800: "semanal", 2592000: "mensal", 86400: "diária"}
 MODELOS_PAGOS_CODEX = {"gpt-6.2-sol", "gpt-6.2-astra"}
 RITMO = {604800, 2592000}
 MEDIDORES_AGY_CLAUDE = {"claude and gpt", "claude and gpt models"}
+FAMILIAS = ("Claude", "GPT", "Gemini", "aberto", "desconhecido")
+LOG_DISTRIBUICAO = "distribuicao.log"
 
 
 def arquivo_status() -> Path:
@@ -36,6 +38,32 @@ def _data(texto):
         return data if data.tzinfo is not None else None
     except ValueError:
         return None
+
+
+def formatar_distribuicao(familias):
+    contagem = dict.fromkeys(FAMILIAS, 0)
+    for familia in familias:
+        contagem[familia if familia in contagem else "desconhecido"] += 1
+    return " · ".join(f"{familia} {n}" for familia, n in contagem.items())
+
+
+def distribuicao_recente(pasta, agora=None):
+    agora = agora or datetime.now(timezone.utc)
+    limite = agora - timedelta(hours=5)
+    familias = []
+    try:
+        with (pasta / LOG_DISTRIBUICAO).open(encoding="utf-8", errors="replace") as linhas:
+            for linha in linhas:
+                campos = linha.rstrip("\r\n").split("\t")
+                if len(campos) == 6:
+                    data = _data(campos[0])
+                    if data is not None and limite <= data <= agora:
+                        familias.append(campos[3])
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        return f"aviso: não foi possível ler {LOG_DISTRIBUICAO}: {exc}"
+    return "Despachos nas últimas 5 h por família: " + formatar_distribuicao(familias)
 
 
 def _falta(ate, agora):
@@ -134,8 +162,8 @@ def _janela(janela, agora):
     return {"janela": rotulo, "usado": usado, "reset": reset, "falta": _falta(reset, agora), "ritmo": ritmo}
 
 
-def _medidores(provedor, agora, origem):
-    nome = provedor.get("name") or provedor.get("id", "?")
+def _medidores(provedor, agora, origem, avisos):
+    nome = provedor.get("name") or provedor.get("id") or "?"
     plano = provedor.get("plan") or ""
     claude_code = provedor.get("id") == "claude" or nome.casefold() == "claude code"
     antigravity = provedor.get("id") == "antigravity" or nome.casefold() == "antigravity"
@@ -150,8 +178,27 @@ def _medidores(provedor, agora, origem):
         horas = (agora - ultimo).total_seconds() / 3600
         motivos_provedor.append(f"última leitura há {horas:.1f} h")
 
-    for medidor in provedor.get("meters") or [{}]:
+    medidores = provedor.get("meters")
+    if medidores is not None and not isinstance(medidores, list):
+        avisos.append(f"{nome}: meters inválido (esperada uma lista)")
+        return
+    for i, medidor in enumerate(medidores or [{}]):
+        if not isinstance(medidor, dict) or any(
+            medidor.get(campo) is not None and not isinstance(medidor[campo], str)
+            for campo in ("label", "id")
+        ):
+            avisos.append(f"{nome}: meters[{i}] inválido, ignorado")
+            continue
         medidor_nome = medidor.get("label") or medidor.get("id") or nome
+        janelas_brutas = medidor.get("windows")
+        if janelas_brutas is not None and (
+            not isinstance(janelas_brutas, list) or any(
+                not isinstance(j, dict) or (j.get("title") is not None and not isinstance(j["title"], str))
+                for j in janelas_brutas
+            )
+        ):
+            avisos.append(f"{nome}/{medidor_nome}: windows inválido, medidor ignorado")
+            continue
         via_claude = None
         if claude_code:
             via_claude = "Claude Code"
@@ -160,7 +207,7 @@ def _medidores(provedor, agora, origem):
             or (medidor.get("id") or "").casefold() in MEDIDORES_AGY_CLAUDE
         ):
             via_claude = "Antigravity"
-        janelas = [_janela(j, agora) for j in (medidor.get("windows") or [])]
+        janelas = [_janela(j, agora) for j in (janelas_brutas or [])]
         usos = [j["usado"] for j in janelas if j["usado"] is not None]
         resets = [j["reset"] for j in janelas if j["reset"]]
         uso_max = max(usos, default=None)
@@ -201,18 +248,32 @@ def ler_cotas():
     agora = datetime.now(timezone.utc)
     pools, avisos = [], []
     try:
-        provedores = json.loads(caminho.read_text(encoding="utf-8-sig")).get("providers") or []
+        dados = json.loads(caminho.read_text(encoding="utf-8-sig"))
+        provedores = dados.get("providers", []) if isinstance(dados, dict) else None
     except (OSError, UnicodeError, ValueError, AttributeError):
         provedores = []
         avisos.append(f"sem dados de cota do Maestri: {caminho} ausente ou ilegível")
+    if not isinstance(provedores, list):
+        provedores = []
+        avisos.append(f"sem dados de cota do Maestri: {caminho} inválido (esperada lista em providers)")
     tem_codex = False
-    for prov in provedores:
-        nome = prov.get("name") or prov.get("id", "?")
+    for i, prov in enumerate(provedores):
+        if not isinstance(prov, dict) or any(
+            prov.get(campo) is not None and not isinstance(prov[campo], str)
+            for campo in ("name", "id", "plan")
+        ):
+            avisos.append(f"Maestri: providers[{i}] inválido, ignorado")
+            continue
+        nome = prov.get("name") or prov.get("id") or "?"
         codex = prov.get("id") == "codex" or nome.casefold() == "codex"
         tem_codex = tem_codex or codex
         if not prov.get("enabled", True):
             continue
-        medidores = list(_medidores(prov, agora, "maestri"))
+        notas = prov.get("notes")
+        if notas is not None and not isinstance(notas, list):
+            avisos.append(f"{nome}: notes inválido, ignorado")
+            prov = {**prov, "notes": []}
+        medidores = list(_medidores(prov, agora, "maestri", avisos))
         avisos.extend(f"{nome}: {nota}" for nota in (prov.get("notes") or []))
         if codex:
             plano = (prov.get("plan") or "").casefold()
@@ -259,8 +320,8 @@ def _cotas_rollout():
         provedor = _snapshot_codex(arquivo)
         if provedor is None:
             continue
-        medidores = list(_medidores(provedor, datetime.now(timezone.utc), "codex_rollout"))
-        if all(p["estado"] == "ready" for p in medidores):
+        medidores = list(_medidores(provedor, datetime.now(timezone.utc), "codex_rollout", []))
+        if medidores and all(p["estado"] == "ready" for p in medidores):
             return medidores
     return []
 
@@ -357,7 +418,13 @@ def main() -> int:
                 j["reset"] = j["reset"].isoformat() if j["reset"] else None
         print(json.dumps({"pools": pools, "avisos": avisos, "ordem_claude": claude}, ensure_ascii=False, indent=1))
         return 0
-    print("\n".join(resumo_linhas(pools, avisos)))
+    linhas = resumo_linhas(pools, avisos)
+    atual = Path.cwd()
+    pasta = next((raiz / ".maestri" for raiz in (atual, *atual.parents)
+                  if (raiz / ".maestri").is_dir()), atual / ".maestri")
+    if linha := distribuicao_recente(pasta):
+        linhas.append(linha)
+    print("\n".join(linhas))
     return 0 if pools else 1
 
 

@@ -40,11 +40,12 @@ MEDIDORES_GEMINI_CONFIRMADOS = {
     "gemini-pro-orchestrator-neon": "gemini-models",
     "gemini-pro-orchestrator-g1-pro": "gemini-4-argon",
 }
+MEDIDORES_GEMINI_CONHECIDOS = ("Gemini Models", "Gemini 4 Argon")
 
 
 def rodar(args, timeout=30):
     try:
-        p = subprocess.run(args, capture_output=True, timeout=timeout)
+        p = subprocess.run(args, capture_output=True, stdin=subprocess.DEVNULL, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired) as e:
         return None, str(e)
     saida = p.stdout.decode("utf-8", "replace")
@@ -215,6 +216,17 @@ def ferramenta_e_pool(comando, plano_claude, medidores_agy=()):
     else:
         pool = "pool não identificado"
     return CLIS[cli], pool
+
+
+def comando_da_formacao(ferramenta, modelo, preset):
+    """Representa os metadados da equipe quando o CLI não expõe o preset."""
+    cli = next((cli for cli, nome in CLIS.items() if nome.casefold() == ferramenta.casefold()), "")
+    if not cli:
+        return ""
+    modelo = re.sub(r"[^\w]+", "-", modelo.casefold()).strip("-")
+    if cli == "opencode" and re.search(r"\bgr[aá]tis\b", preset, re.I):
+        modelo = "opencode-gratis"
+    return f"{cli} --model {modelo}" if modelo else cli
 
 
 def comando_preset(detalhes):
