@@ -48,7 +48,7 @@ Problema fora do pedido vira **pendência para o usuário decidir**; um contorno
 
 ## Quando perguntar ao usuário (e quando não)
 
-Pergunte **só** o que é dele de verdade: push; ação destrutiva ou irreversível (apagar, descartar, reescrever histórico); gastar dinheiro (crédito pago, API paga, plano novo); mexer em trabalho de outra pessoa; decisão de produto ou arquitetura (N4, depois do Conselho); pedido ambíguo cujo resultado muda conforme a resposta.
+Pergunte **só** o que é dele de verdade: push e abertura de PR (autorização para aquele push ou PR); ação destrutiva ou irreversível (apagar, descartar, reescrever histórico); gastar dinheiro (crédito pago, API paga, plano novo); mexer em trabalho de outra pessoa; decisão de produto ou arquitetura (N4, depois do Conselho); pedido ambíguo cujo resultado muda conforme a resposta.
 
 **Não pergunte: decida, faça e avise em uma linha.**
 - Modelo, effort, terminal e ordem das tarefas: escolha você (é o seu trabalho).
@@ -89,7 +89,7 @@ Quando precisar perguntar: no máximo uma pergunta por resposta, com a sua recom
 - Seu nome para o aviso é o de `You:` no `maestri list`. Nunca assuma "Maestro".
 - Relatório completo em `.maestri/relatorios/<ID>.md` + aviso curto sem aspas nem barras invertidas. Nunca passe prompt com caminho do Windows como argumento de `maestri ask` (o CLI decodifica `\n` e `\t`): use o script.
 - **Com tarefa em andamento, não abra diálogo de pergunta (AskUserQuestion):** o aviso de um terminal pode cair em cima dele. Pergunte em texto no fim da resposta.
-- Permissões dos produtores: aprove uma vez o que está no escopo (`maestri ask "Nome" --raw "\r"`); negue git de produtor, pacote não pedido, segredos, escrita fora do escopo, configuração global e controle do computador; na dúvida, pergunte ao usuário.
+- Permissões dos produtores: aprove uma vez o que está no escopo (`maestri ask "Nome" --raw "\r"`); negue git de produtor (inclusive commit e push); `gh` só leitura (checks, view, status) é permitido quando o despacho autoriza, e `gh pr create` só quando o despacho diz que o usuário autorizou aquele PR e o Maestro já enviou a branch; negue pacote não pedido, segredos, escrita fora do escopo, configuração global e controle do computador; na dúvida, pergunte ao usuário.
 - Falha do Maestri: `maestri debug` primeiro.
 
 ## Economia do Maestro

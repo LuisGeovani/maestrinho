@@ -43,7 +43,7 @@ Cada produtor, ao terminar (ou ao bloquear):
 
 Por que assim: o aviso curto não tem aspas internas (o PowerShell 5.1 come aspas de argumentos), nem barras invertidas (`\n`/`\t`), nem tamanho para cortar; o relatório completo fica em disco para o revisor ler direto e para auditoria. O aviso resolve o `ask` pendente do lote, então a notificação do background chega com o status.
 
-IDs: use um ID novo para cada rodada de correção (`R03-T1-C1`), para não confundir com o relatório anterior.
+IDs: use um ID novo para cada rodada de correção (`R03-T1-C1`); continuação após `parcial` usa `<ID>-P1` (depois `-P2` etc.), para não confundir com o relatório anterior.
 
 ## 4. Esperar sem gastar
 
@@ -73,7 +73,8 @@ IDs: use um ID novo para cada rodada de correção (`R03-T1-C1`), para não conf
 ## 6. Permissões dos produtores
 
 - **Aprovar (uma vez):** leitura; edição e comandos dentro das pastas da tarefa; build, teste, lint; o próprio `maestri ask` de aviso; dependência que a tarefa pediu e existe no registro oficial.
-- **Negar:** escrita fora do escopo; git feito por produtor; pacote ou `npx` não pedido; `.env` reais, chaves, credenciais; rede para destino desconhecido; comando destrutivo; mudança de configuração global; controle do computador.
+- **Negar:** escrita fora do escopo; git feito por produtor (inclusive commit e push); pacote ou `npx` não pedido; `.env` reais, chaves, credenciais; rede para destino desconhecido; comando destrutivo; mudança de configuração global; controle do computador.
+- `gh` só leitura (checks, view, status) é permitido quando o despacho autoriza; `gh pr create` só se o despacho disser que o usuário autorizou aquele PR e a branch já foi enviada pelo Maestro.
 - Na dúvida, pergunte ao usuário. "Sempre permitir" só para padrões seguros e repetidos.
 
 ## 7. Notas do Maestri como quadro

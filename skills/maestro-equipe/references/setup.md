@@ -47,13 +47,13 @@ maestri preset create "Haiku" --command "claude --model haiku --effort medium --
 - Presets antigos com caminho de projeto fixo continuam funcionando, mas pare de criar novos; prefira os genéricos. Use nomes que não colidam com presets antigos (ex.: "Haiku" em vez de um "Claude Haiku" que já aponta para outro projeto).
 - **Preset com caminho fixo:** o `inventario.py` lista, uma linha por preset, os que têm `--add-dir`/`--dir` com caminho absoluto (ou do diretório pessoal), que quase sempre é de outro projeto. Corrija com `maestri preset set "<Nome>" --command "<comando genérico da tabela acima>"` (ou crie o genérico e apague o antigo) e reabra os terminais que o usam com `recruit --replace`. `--dir <RAIZ>` de um preset sem papel é uso legítimo: o aviso só pede que você confirme que a pasta é deste projeto.
 - Presets de produtor podem ficar fora do Quick Start (`--quick-start off`): quem os usa é o Maestro. O Quick Start tem limite; se estiver cheio, o preset novo não aparece lá, mas funciona no `--preset`.
-- Para variar um effort só uma vez, `recruit` aceita `--command` junto com `--preset` (o preset dá o tipo e o ícone): `maestri recruit "Nome" --preset "Claude Code" --command "claude --model haiku --effort low --add-dir ../../.." --role "Papel"`.
+- Para variar um effort só uma vez, `recruit` aceita `--command` junto com `--preset` (o preset dá o tipo e o ícone): `maestri recruit "<Nome>" --preset "Claude Code" --command "claude --model haiku --effort low --add-dir ../../.." --role "Papel" --replace "<Nome>"`.
 - IDs de modelo mudam: confira no `inventario.py` (para o Antigravity, `agy models`) antes de criar.
 - Nunca `--dangerously-skip-permissions` (agy) nem `--yolo` (codex) num preset de produtor.
 
 ### Formação padrão (o que propor ao usuário)
 
-Proponha, confirme e anote em `.maestri/equipe.md` pelo menos um terminal de cada modelo principal (GPT: Luna, Terra, Sol, Astra; Claude: Haiku, Sonnet, Opus; Gemini: Hydrogen ou Flash, Argon, Neon; mais OpenCode grátis). Efforts em `roteamento.md` §3. Para variar o effort entre tarefas, use `recruit --command` com o preset.
+Proponha, confirme e anote em `.maestri/equipe.md` pelo menos um terminal de cada modelo principal (GPT: Luna, Terra, Sol, Astra; Claude: Haiku, Sonnet, Opus; Gemini: Hydrogen ou Flash, Argon, Neon; mais OpenCode grátis). Efforts em `roteamento.md` §3. Para variar o effort entre tarefas no mesmo terminal, use `recruit --command` com o preset e `--replace "<Nome>"`.
 
 **Com três planos pagos (Claude, Gemini e Codex) + OpenCode grátis: 11 vagas padrão (pelo menos um terminal de cada modelo principal).**
 
@@ -71,9 +71,9 @@ Proponha, confirme e anote em `.maestri/equipe.md` pelo menos um terminal de cad
 | Gemini | Neon high (xhigh no Conselho via `--command`) | Agy Neon | Crítico N3, Revisor, QA visual e voz Gemini no Conselho N4 |
 | Abertos | OpenCode grátis | OpenCode Gratis | Batedor de custo zero: leitura, triagem, resumo e comandos/testes fechados |
 
-- **Onde rodam os modelos Claude e limite no Claude Code:** Sonnet e Opus preferem o Antigravity (`Agy Sonnet` e `Agy Opus`, pool "Claude and GPT"). No Claude Code ficam o **Haiku**, eventual terminal com `--chrome` (usado só quando o site exige a sessão logada no Chrome do usuário e nem CLI/API com shell nem o Portal do Maestri atendem) e **no máximo um produtor Claude Code generalista** enquanto o Claude and GPT do Antigravity estiver bloqueado (voltando ao Antigravity no reset).
+- **Onde rodam os modelos Claude e limite no Claude Code:** Sonnet e Opus preferem o Antigravity (`Agy Sonnet` e `Agy Opus`, pool "Claude and GPT"). No Claude Code ficam o **Haiku**, eventual terminal com `--chrome` (usado só quando o site exige a sessão logada no Chrome do usuário e nem CLI/API com shell nem o Portal do Maestri atendem) e **no máximo um produtor Claude Code generalista** quando Sonnet e Opus não puderem rodar no Antigravity, por bloqueio ou ausência do plano. Sonnet é o generalista fixo; Opus entra sob demanda (`recruit --replace` ou `--command`) e sai depois. Terminal mantido por recurso exclusivo (Chrome, SSH/LAN) não conta no limite enquanto só recebe tarefas que exigem o recurso; se receber tarefa geral, ele é o generalista. No reset, volte ao Antigravity.
 - **Extras sob demanda:** `Agy Orchestrator Neon` para tarefa multi-arquivo no Antigravity e `Agy Flash` separado para triagem textual N0 quando ambos (Hydrogen e Flash) forem usados na mesma rodada após confirmação do medidor.
-- **Com menos planos:** monte a equipe com pelo menos um terminal de cada modelo principal dos planos disponíveis mais o OpenCode grátis. Aplique a mesma ordem de decisão (ferramenta → degrau mínimo apto → família pela folga → ordem interna) e o limite de produtores no Claude Code. Se faltar outra família qualificada para revisar, avise o usuário e registre a revisão como pendente.
+- **Com menos planos:** monte a equipe com pelo menos um terminal de cada modelo principal dos planos disponíveis mais o OpenCode grátis. Aplique a mesma ordem de decisão (ferramenta → degrau mínimo apto → família pela folga → ordem interna) e o limite de produtores no Claude Code, inclusive na ausência do plano Antigravity; nesse caso, Sonnet é fixo e Opus entra sob demanda e sai depois. Se faltar outra família qualificada para revisar, avise o usuário e registre a revisão como pendente.
 
 ### Manutenção da formação
 
@@ -173,7 +173,7 @@ Gera `maestro/settings.gerado.json` (hook que bloqueia ferramentas de trabalho) 
 ## 9. Git do projeto
 
 - `.gitignore` com `.maestri/` (papéis, despachos, relatórios, contexto), `node_modules`, builds, `.env*` (menos `!.env.example`) e `.worktrees/`; quem edita é um produtor.
-- Commits pequenos, só no nome do usuário. Push e PR só com autorização explícita para aquele push.
+- Commits pequenos, só no nome do usuário. Commit e push são do Maestro; push e abertura de PR exigem autorização explícita para aquele push ou PR. Produtor só pode abrir PR com `gh pr create` se o despacho disser que o usuário autorizou aquele PR e a branch já foi enviada pelo Maestro.
 - Em repositório compartilhado, preserve alterações fora do escopo do despacho. Confira os caminhos contra todos os despachos ativos e identifique o responsável. Peça autorização explícita do usuário antes de descartar. Após a autorização, confira com `git diff --stat` e faça backup da alteração afetada antes do descarte.
 - Em repositório compartilhado, não commite em `develop`/`main` e use `git pull --ff-only`. Para trazer arquivos de outra branch sem commit, use `git restore --source=<ref> --worktree -- <pasta>`. Reescrita de histórico exige confirmação e `--force-with-lease`.
 
