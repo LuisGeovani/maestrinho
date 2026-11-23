@@ -329,6 +329,146 @@ class TestEquilibrio(unittest.TestCase):
         self.assertIn("== Ferro (T5): pronto", saida)
         self.assertEqual(self.log.read_text(encoding="utf-8").count("\tT5\t"), 1)
 
+    def test_formacao_sem_preset_coluna_pool_e_modelo_effort(self):
+        self.equipe.write_text(
+            "| Terminal | Ferramenta | Modelo · effort | Perfis | Pool |\n"
+            "|---|---|---|---|---|\n"
+            "| Hydrogen | Antigravity | Gemini 4 Hydrogen · high | Batedor, Volume | Gemini Models |\n"
+            "| Neon | Antigravity | Gemini 4 Neon · high | Crítico, Revisor | Gemini Models |\n"
+            "| Argon | Antigravity | Gemini 4 Argon · high | Volume de cuidado | Gemini 4 Argon |\n"
+            "| Sol | Codex | GPT-6.2 Sol · medium | Volume | Codex |\n"
+            "| OpenCode | OpenCode | grátis · medium | Batedor | grátis |\n",
+            encoding="utf-8",
+        )
+        pools = self.cotas_do_caso()
+        texto = (
+            "### Hydrogen | H1\nOk.\n"
+            "### Neon | N1\nOk.\n"
+            "### Argon | A1\nOk.\n"
+            "### Sol | S1\nValide com: pytest\n"
+            "### OpenCode | O1\nOk.\n"
+        )
+        aceitas, retidas, avisos = self.avaliar(texto, pools)
+        self.assertEqual(retidas, [])
+        self.assertNotIn("pool desconhecido", avisos)
+        self.assertEqual({k: v[1:3] for k, v in aceitas.items()}, {
+            "Hydrogen": ("Gemini", "Gemini Models"),
+            "Neon": ("Gemini", "Gemini Models"),
+            "Argon": ("Gemini", "Gemini 4 Argon"),
+            "Sol": ("GPT", "Codex"),
+            "OpenCode": ("aberto", "grátis"),
+        })
+
+    def test_fallback_rodape_tela_antigravity(self):
+        self.equipe.unlink()
+        pools = self.cotas_do_caso()
+        self.preset.side_effect = [
+            ("  Gemini 4 Hydrogen (High)  auto  shift+tab\n", ""),
+            ("  Gemini 4 Argon (High)  auto  shift+tab\n", ""),
+        ]
+        texto = "### Hydrogen | H1\nOk.\n### Argon | A1\nOk.\n"
+        aceitas, retidas, avisos = self.avaliar(texto, pools)
+        self.assertEqual(retidas, [])
+        self.assertNotIn("pool desconhecido", avisos)
+        self.assertEqual(aceitas["Hydrogen"][1:3], ("Gemini", "Gemini Models"))
+        self.assertEqual(aceitas["Argon"][1:3], ("Gemini", "Gemini 4 Argon"))
+
+    def test_avisar_pedido_antigravity_nao_aprova_e_deduplica(self):
+        for agente, tela_fake in (
+            ("Neon", "canva/read-design\nAllow calling this tool?\n1. Allow once\n2. Always allow"),
+            ("Hydrogen", "C:\\tmp\\a.md\nAllow access to this file?\n1. Allow\n2. Deny"),
+        ):
+            with self.subTest(agente=agente):
+                buf, avisados = Saida(), {}
+                with patch.object(batch, "tela", return_value=tela_fake), redirect_stdout(buf):
+                    batch.avisar_pedido("maestri", agente, avisados)
+                    batch.avisar_pedido("maestri", agente, avisados)  # deduplicado
+                out = buf.getvalue()
+                self.assertEqual(out.count(f"PERMISSAO pendente: {agente}"), 1)
+                self.assertIn("Allow", out)
+
+    def test_trava_gemini_preferencial_e_limites(self):
+        def pools_custom(gem_sem, gem_5h, codex_sem, claude_sem):
+            def med(nome, sem, cinco=None):
+                js = [{"durationSeconds": 604800, "usedPercent": sem,
+                       "resetsAt": (self.agora + timedelta(days=3)).isoformat()}]
+                if cinco is not None:
+                    js.append({"durationSeconds": 18000, "usedPercent": cinco,
+                               "resetsAt": (self.agora + timedelta(hours=3)).isoformat()})
+                return {"label": nome, "windows": js}
+
+            def prov(ident, nome, plano, meds):
+                return {"id": ident, "name": nome, "plan": plano, "meters": meds,
+                        "state": "ready", "lastSuccessAt": self.agora.isoformat()}
+
+            self.status.write_text(json.dumps({"providers": [
+                prov("claude", "Claude Code", "Pro", [med("Limites do plano", claude_sem, 10)]),
+                prov("codex", "Codex", "Plus", [med("Codex", codex_sem, 10)]),
+                prov("antigravity", "Antigravity", "", [
+                    med("Gemini Models", gem_sem, gem_5h),
+                    med("Gemini 4 Argon", gem_sem),
+                ]),
+            ]}), encoding="utf-8")
+            return cotas.ler_cotas()[0]
+
+        # 1) Gemini 60% vs Codex 40% -> NAO retido (mesmo com +20 pp)
+        pools = pools_custom(gem_sem=60, gem_5h=20, codex_sem=40, claude_sem=40)
+        aceitas, retidas, _ = self.avaliar("### Malho | G1\nOk.\n### Ferro | G2\nOk.\n", pools)
+        self.assertEqual(retidas, [])
+        self.assertEqual(set(aceitas), {"Malho", "Ferro"})
+
+        # 2) Gemini 85% semanal -> RETIDO (e liberado com Motivo pool:)
+        pools = pools_custom(gem_sem=85, gem_5h=20, codex_sem=40, claude_sem=40)
+        aceitas, retidas, _ = self.avaliar("### Malho | G3\nOk.\n### Ferro | G4\nMotivo pool: necessário.\n", pools)
+        self.assertEqual(len(retidas), 1)
+        self.assertIn("RETIDO (equilíbrio): Malho | G3", retidas[0])
+        self.assertIn("Ferro", aceitas)
+
+        # 3) Gemini 5h 90% (mesmo com semanal 50%) -> RETIDO
+        pools = pools_custom(gem_sem=50, gem_5h=90, codex_sem=40, claude_sem=40)
+        aceitas, retidas, _ = self.avaliar("### Malho | G5\nOk.\n", pools)
+        self.assertEqual(len(retidas), 1)
+        self.assertIn("RETIDO (equilíbrio): Malho | G5", retidas[0])
+
+        # 4) Claude 70% vs Gemini 40% -> Claude RETIDO como antes
+        pools = pools_custom(gem_sem=40, gem_5h=10, codex_sem=50, claude_sem=70)
+        aceitas, retidas, _ = self.avaliar("### Tocha | C1\nOk.\n", pools)
+        self.assertEqual(len(retidas), 1)
+        self.assertIn("RETIDO (equilíbrio): Tocha | C1: Claude Pro 70% vs Gemini Models 40%", retidas[0])
+
+    def test_cotas_gemini_rotina_ate_80_semanal_e_preferencial(self):
+        # Gemini 60% semanal no começo da semana (ritmo adiantado) continua rotina e lidera "Gaste primeiro"
+        self.status.write_text(json.dumps({"providers": [
+            {"id": "codex", "name": "Codex", "plan": "Plus", "state": "ready",
+             "lastSuccessAt": self.agora.isoformat(),
+             "meters": [{"label": "Codex", "windows": [
+                 {"durationSeconds": 604800, "usedPercent": 20,
+                  "resetsAt": (self.agora + timedelta(days=6)).isoformat()},
+             ]}]},
+            {"id": "antigravity", "name": "Antigravity", "plan": "", "state": "ready",
+             "lastSuccessAt": self.agora.isoformat(),
+             "meters": [
+                 {"label": "Gemini Models", "windows": [
+                     {"durationSeconds": 604800, "usedPercent": 60,
+                      "resetsAt": (self.agora + timedelta(days=6)).isoformat()},
+                     {"durationSeconds": 18000, "usedPercent": 50,
+                      "resetsAt": (self.agora + timedelta(hours=4)).isoformat()},
+                 ]},
+                 {"label": "Gemini 4 Argon", "windows": [
+                     {"durationSeconds": 604800, "usedPercent": 85,
+                      "resetsAt": (self.agora + timedelta(days=6)).isoformat()},
+                 ]},
+             ]},
+        ]}), encoding="utf-8")
+        pools, _ = cotas.ler_cotas()
+        gem = next(p for p in pools if p["medidor"] == "Gemini Models")
+        argon = next(p for p in pools if p["medidor"] == "Gemini 4 Argon")
+        self.assertEqual(gem["despacho"], "rotina")
+        self.assertEqual(argon["despacho"], "só insubstituível")
+        resumo = "\n".join(cotas.resumo_linhas(pools, []))
+        gaste = next(l for l in resumo.splitlines() if l.startswith("Gaste primeiro:"))
+        self.assertLess(gaste.index("Antigravity/Gemini Models"), gaste.index("Codex/Codex"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,9 +12,9 @@ Nomes e IDs mudam rápido. Antes de criar presets, confira com `python <skill>/s
 | | **Sonnet 5.5** | produção cuidadosa, revisão de outra família, verificação com shell no Claude Code | volume que cabe no Hydrogen ou no Sol |
 | | **Opus 5.5** | redação de registro formal, N3/N4, voz Claude no Conselho | rotina e uso do Claude Pro fora das condições de `roteamento.md` §4 |
 | Gemini | **Gemini 3.8 Flash** | triagem e classificação N0 de texto já convertido | agente de terminal, código e verificação de fonte/fato |
-| | **Hydrogen** | código e UI bem especificados em lote, pesquisa ampla | escopo vago e verificação de fonte/fato |
+| | **Hydrogen** | código e UI bem especificados em lote, QA visual correto e barato, pesquisa ampla, comandos com aprovação | escopo vago e servidor MCP grande em modo Eager (corte por tamanho de schema) |
 | | **Argon** | tarefa longa, redação ou engenharia cuidadosa, diff curto | N3 decisivo |
-| | **Neon** | N3, revisão de diff e de texto, QA visual, multimodal | trivial e xhigh sem necessidade |
+| | **Neon** | N3, diagnóstico, edição via MCP (modo Lazy), revisão de diff e de texto, QA visual, multimodal | trivial e xhigh sem necessidade |
 | GPT | **Luna** | script, configuração e checagem N0–N1 com passos fechados e teste automático obrigatório | engenharia aberta, redação e verificação de fonte/fato |
 | | **Terra** | escrita rápida, resumo, conversão de formato e visão | código difícil |
 | | **Sol** | degrau médio GPT: código por especificação, revisão de diff e verificação com shell e prova bruta | tarefa sem critério de aceite e N0–N1 que cabem em Luna ou Terra |
@@ -24,11 +24,11 @@ Nomes e IDs mudam rápido. Antes de criar presets, confira com `python <skill>/s
 
 Os abertos são a quarta família para roteamento. O catálogo de OpenCode abaixo detalha as opções. O pool "Claude and GPT" do Antigravity atende Agy Sonnet e Agy Opus. Hydrogen e Neon usam "Gemini Models", Argon tem teto semanal próprio e os quatro GPT compartilham o medidor Codex. O Gemini 3.8 Flash tem medidor desconhecido até confirmação do vínculo no provedor. Só use a folga de "Gemini Models" para ele se esse vínculo for confirmado.
 
-A qualidade relativa de Argon × Neon e Argon × Sonnet segue sem medida [incerto]. Em N3 decisivo, prefira Neon. Veja a matriz e as regras de cota em `roteamento.md`.
+A qualidade relativa de Argon × Neon e Argon × Sonnet segue sem medida [incerto]. **Divisão interna do Gemini:** trabalho importante ou decisivo (**N2 de risco, N3, revisão decisiva, diagnóstico difícil, edição em serviço externo/MCP**) vai primeiro ao **Neon high**; **Hydrogen** fica com volume bem especificado (código/UI em lote, Batedor, QA visual barato, pesquisa); **Argon** fica com tarefa longa de cuidado, poupando seu teto semanal próprio. Veja a matriz e as regras de cota em `roteamento.md`.
 
 ## Claude (Opus e Sonnet: PRIMEIRO no Antigravity, pool "Claude and GPT"; SÓ DEPOIS no Claude Code)
 
-Nenhuma família é padrão: aplique ferramenta (requisito duro) → degrau mínimo apto → família pela folga (equalizar) → ordem interna da família. Na família Claude, use primeiro Agy Sonnet / Agy Opus no medidor "Claude and GPT". Com esse medidor bloqueado (ou quando a tarefa exigir shell/Chrome), os candidatos Claude entram na comparação pela folga do Claude Pro (que inclui o Maestro) e a trava de equilíbrio de `roteamento.md` §4 vale para eles; volte ao Antigravity no reset.
+Gemini é a família preferida por padrão (cota enche bem mais devagar). Claude entra quando a ferramenta exige (`--chrome`), quando o pool Gemini estiver apertado (semanal ≥ 80% ou 5 h ≥ 90%), ou quando a revisão cruzada pedir outra família. Na família Claude, use primeiro Agy Sonnet / Agy Opus no medidor "Claude and GPT". Com esse medidor bloqueado (ou quando a tarefa exigir `--chrome`), os candidatos Claude entram na comparação pela folga do Claude Pro (que inclui o Maestro) e a trava de equilíbrio de `roteamento.md` §4 vale para eles; volte ao Antigravity no reset.
 
 | Modelo | Bom em | Evite | Effort |
 |---|---|---|---|
@@ -47,8 +47,8 @@ IDs = `<modelo>-<effort>` (ex.: `gemini-4-neon-high`). Effort maior gasta mais c
 
 | Modelo | Bom em | Evite | Effort |
 |---|---|---|---|
-| **Gemini 4 Neon** (18/11/2026; $3/$15; 512K no agy) | o mais forte do plano Pro: implementação e refatoração difíceis, multimodal e documentos longos, **revisão** (menor fabricação medida, honestidade 99,2%), QA visual; Coding Agent Index 59 (Opus 5.5 max: 58); Terminal-Bench 4.1 65,2% | tarefa simples em xhigh (pensa demais) | high; xhigh só em problema difícil de vários passos |
-| **Gemini 4 Hydrogen** ($1,50/$7,50) | o "burro de carga": volume de código bem especificado, UI em lotes por página/fluxo, edições cirúrgicas (até 81% menos overreach), pesquisa web; TB 4.1 57%; ~2,5x mais rápido que o 3.8 Flash | tarefa vaga, sem escopo fechado | high; medium em código interativo e protótipo de UI; low em trivial |
+| **Gemini 4 Neon** (18/11/2026; $3/$15; 512K no agy) | o mais forte do plano Pro: implementação e refatoração difíceis, **diagnóstico** e **edição via MCP** de primeira (carrega ferramentas em modo Lazy; comprovado com 44 ferramentas do Canva + `curl`/Python), multimodal e documentos longos, **revisão** (menor fabricação medida, honestidade 99,2%), QA visual; Coding Agent Index 59 (Opus 5.5 max: 58); Terminal-Bench 4.1 65,2% | tarefa simples em xhigh (pensa demais) | high; xhigh só em problema difícil de vários passos |
+| **Gemini 4 Hydrogen** ($1,50/$7,50) | o "burro de carga": volume de código bem especificado, UI em lotes por página/fluxo, **QA visual correto e barato**, edições cirúrgicas (até 81% menos overreach), pesquisa web; TB 4.1 57%; ~2,5x mais rápido que o 3.8 Flash | tarefa vaga, sem escopo fechado; servidor MCP grande em modo Eager (corta ferramentas acima de ~10,5 KB) | high; medium em código interativo e protótipo de UI; low em trivial |
 | **Orchestrator (Neon)** `gemini-pro-orchestrator-neon` | features, bugs, refatoração e debug **multi-arquivo**: Neon planeja só-leitura e revisa, Hydrogen executa (na versão Carbon: −24% de cota) | design de sistemas, concorrência, migrações (use o modelo puro) | fixo |
 | **Orchestrator (Argon)** `gemini-pro-orchestrator-g1-pro` | o mesmo, com Argon planejando | — | fixo |
 | **Gemini 4 Argon** (30/09/2026) | **modelo principal de nível médio** da escada Gemini: tarefa longa e de redação/engenharia que pede mais cuidado que o Hydrogen, refatoração ampla, segunda voz Gemini com o Neon ocupado; AA 50, DeepSWE 77,9%, multimodal denso (LVBench 91,7%); **teto semanal próprio** (não gasta o pool Gemini principal) | N3 de risco alto e revisão decisiva (o Neon supera o Argon em qualidade `[incerto]`); volume trivial (gasta o teto à toa) | medium; high no difícil; low só em trivial |

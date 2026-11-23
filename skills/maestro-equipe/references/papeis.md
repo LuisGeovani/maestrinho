@@ -42,7 +42,7 @@ Quem revisa é sempre de outra família de modelo; no relatório, VISAO é opcio
 ## Bloco do Antigravity
 
 ```
-No Antigravity, o comando maestri ask de aviso está liberado nas regras do settings.json. Se mesmo assim der access denied, rode de novo SOMENTE o comando maestri fora do sandbox (nenhum outro comando sai do sandbox). Use o modelo do seu preset e não troque de modelo sozinho. Edite só o que a tarefa listar, não crie arquivos extras e não invente caminhos. Você lê texto e imagem, não binário (PDF, Office, zip...), e o sandbox pode bloquear scripts: se o despacho depender disso e der erro, reporte bloqueado em vez de contornar. Não declare URL ou fonte como conferida só por busca. Se a tarefa pedir abrir URL ou confirmar fonte, reporte bloqueado.
+No Antigravity, o comando maestri ask de aviso está liberado nas regras do settings.json. Se mesmo assim der access denied, rode de novo SOMENTE o comando maestri fora do sandbox. Comandos de shell (curl, python, PowerShell) fora do sandbox e ferramentas MCP rodam quando o despacho autorizar e o Maestro aprovar a permissão. Use o modelo do seu preset e não troque de modelo sozinho. Edite só o que a tarefa listar, não crie arquivos extras e não invente caminhos. Você lê texto e imagem, não binário (PDF, Office, zip...): se o despacho depender de abrir binário direto via read_file sem conversão prévia, reporte bloqueado. Não declare URL ou fonte como conferida só por busca; para confirmar URL ou fonte, use shell autorizado e registre prova bruta (comando, código HTTP e trecho literal).
 ```
 
 ## Bloco do Codex

@@ -47,14 +47,16 @@ from inventario import (
 
 LIMITE_JSON = 24000
 LIMIAR_EQUILIBRIO = 15
-COLUNAS_CLI = ("ferramenta", "cli", "preset", "preset/modelo", "modelo", "pool")
+LIMIAR_GEMINI_SEMANAL = 80
+LIMIAR_GEMINI_5H = 90
+COLUNAS_CLI = ("ferramenta", "cli", "preset", "preset/modelo", "modelo", "modelo · effort", "modelo/effort", "pool")
 RE_PRESET_FORMACAO = re.compile(r"^(.+?)\s*\(preset\s+([^)+]+)(?:\s*\+\s*`--command\s+(.+?)`)?", re.I)
 RE_MOTIVO_POOL = re.compile(r"^Motivo pool:\s*(\S.*)", re.I)
 RE_SECAO = re.compile(r"^###\s+(.+?)\s*(?:\|\s*([A-Za-z0-9][\w.\-]*))?\s*$")
 RE_PERMISSAO = re.compile(
     r"(do you want to"
     r"|run this command"
-    r"|allow (this|once|always|the (command|tool|action|file))"
+    r"|allow (this|once|always|calling|access|running|reading|writing|editing|the (command|tool|action|file))"
     r"|needs? (your )?permission"
     r"|permission (required|to (run|use|execute|access|edit|write))"
     r"|waiting for (your )?(approval|confirmation)"
@@ -80,6 +82,11 @@ RE_DESTINO_REJEITADO = re.compile(
 )
 RE_FERRAMENTA = re.compile(r"\b(codex|claude(?: code)?|antigravity|agy|opencode)\b", re.I)
 RE_MODELO_CODEX = re.compile(r"\bgpt-\d+(?:\.\d+)?-(?:luna|terra|sol|astra)\b", re.I)
+RE_MODELO_AGY_TELA = re.compile(
+    r"\b(gemini[-\s]\d+(?:\.\d+)?[-\s](?:neon|hydrogen|argon|flash|carbon)"
+    r"|gemini-pro-orchestrator-(?:neon|g1-pro))\b",
+    re.I,
+)
 RE_METADADOS = re.compile(r'\b(?:tool|cli|agent[_ ]?type|ferramenta|preset|model)\s*:\s*("[^"]+"|[^,|]+)', re.I)
 RE_TELA_CODEX = re.compile(r"^(?:[^\w\n]|_)*(?:OpenAI Codex\b|Ask Codex\b)", re.I | re.M)
 RE_ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
@@ -197,7 +204,7 @@ def janela_pedido(texto, linhas=25):
     return None
 
 
-def avisar_pedido(exe, agente, ident, avisados):
+def avisar_pedido(exe, agente, avisados):
     """Imprime o pedido de permissão uma única vez por pedido.
 
     A deduplicação usa a linha que casou, não a janela inteira: spinner, relógio ou saída
@@ -214,7 +221,7 @@ def avisar_pedido(exe, agente, ident, avisados):
     if avisados.get(agente) == casada:
         return
     avisados[agente] = casada
-    print(f"PENDENTE {agente} {ident}: pedido de permissão", flush=True)
+    print(f"PERMISSAO pendente: {agente}", flush=True)
     for linha in janela:
         print("   " + linha[:200], flush=True)
 
@@ -240,8 +247,8 @@ def esperar_terminar(exe, pendentes, desde, minutos):
             break
         if agora >= proxima_tela:
             proxima_tela = agora + 30
-            for agente, (arq, _) in faltam.items():
-                avisar_pedido(exe, agente, arq.stem, avisados)
+            for agente in faltam:
+                avisar_pedido(exe, agente, avisados)
         time.sleep(10)
     return set(faltam)
 
@@ -355,21 +362,7 @@ def nome_pool(cota):
     return cota["medidor"]
 
 
-def pool_do_destino(exe, linha, plano_claude, medidores, comandos):
-    achado = RE_PRESET_FORMACAO.match(linha.get("ferramenta", ""))
-    if not achado:
-        return "desconhecido", "desconhecido"
-    ferramenta_declarada, preset, comando_extra = achado.groups()
-    preset = preset.strip()
-    if comando_extra:
-        comando = comando_extra.strip().strip("'\"")
-    else:
-        if preset not in comandos:
-            detalhes, _ = rodar([exe, "preset", "show", preset], timeout=5) if exe else (None, None)
-            comandos[preset] = comando_preset(detalhes)
-        comando = comandos[preset]
-    if not CLI_PRESET.search(comando):
-        comando = comando_da_formacao(ferramenta_declarada, linha.get("modelo", ""), preset)
+def _classificar_comando(comando, plano_claude, medidores):
     cli, pool = ferramenta_e_pool(comando, plano_claude, medidores)
     if cli == "OpenCode":
         return "aberto", pool if pool == "grátis" else "desconhecido"
@@ -383,6 +376,77 @@ def pool_do_destino(exe, linha, plano_claude, medidores, comandos):
         return ("Claude" if modelo.startswith("claude-") else "GPT"), pool
     if cli == "Antigravity" and pool in medidores:
         return "Gemini", pool
+    return "desconhecido", "desconhecido"
+
+
+def _modelo_rodape_agy(exe, agente):
+    """Lê o modelo Gemini no rodapé da tela do Antigravity (via `maestri check`)."""
+    if not exe or not agente:
+        return ""
+    saida, _ = rodar([exe, "check", agente], timeout=3)
+    if not saida:
+        return ""
+    limpa = RE_ANSI.sub("", saida)
+    achados = RE_MODELO_AGY_TELA.findall(limpa)
+    if not achados:
+        return ""
+    return re.sub(r"[^\w]+", "-", achados[-1].casefold()).strip("-")
+
+
+def _gemini_apertado(cota):
+    """Gemini só trava em ≥80% na janela semanal (ou ≥90% na de 5 h)."""
+    janelas = cota.get("janelas") or []
+    semanais = [
+        j["usado"] for j in janelas
+        if j.get("usado") is not None and j.get("janela", "").casefold() in ("semanal", "weekly", "mensal", "monthly")
+    ]
+    cinco_h = [
+        j["usado"] for j in janelas
+        if j.get("usado") is not None and j.get("janela", "").casefold() == "5h"
+    ]
+    if semanais or cinco_h:
+        return any(u >= LIMIAR_GEMINI_SEMANAL for u in semanais) or any(u >= LIMIAR_GEMINI_5H for u in cinco_h)
+    return cota.get("uso_max") is not None and cota["uso_max"] >= LIMIAR_GEMINI_SEMANAL
+
+
+def pool_do_destino(exe, linha, plano_claude, medidores, comandos, agente=""):
+    ferr_bruta = linha.get("ferramenta", "").strip()
+    modelo_col = linha.get("modelo") or next((v for k, v in linha.items() if k.startswith("modelo")), "")
+    modelo_bruto = re.split(r"[·,]", re.sub(r"\s*\([^)]*\)", "", modelo_col))[0].strip()
+    pool_declarado = re.sub(r"\s*\([^)]*\)", "", linha.get("pool", "")).strip()
+    comando, ferramenta_declarada, preset = "", "", ""
+    achado = RE_PRESET_FORMACAO.match(ferr_bruta)
+    if achado:
+        ferramenta_declarada, preset, comando_extra = achado.groups()
+        preset = preset.strip()
+        if comando_extra:
+            comando = comando_extra.strip().strip("'\"")
+        else:
+            if preset not in comandos:
+                detalhes, _ = rodar([exe, "preset", "show", preset], timeout=5) if exe else (None, None)
+                comandos[preset] = comando_preset(detalhes)
+            comando = comandos[preset]
+    elif ferr_bruta:
+        ferramenta_declarada = re.sub(r"\s*\([^)]*\)", "", ferr_bruta).strip()
+        if ferramenta_declarada.casefold() == "agy":
+            ferramenta_declarada = "Antigravity"
+    if not CLI_PRESET.search(comando) and ferramenta_declarada:
+        comando = comando_da_formacao(ferramenta_declarada, modelo_bruto, preset or pool_declarado or modelo_bruto)
+    if comando:
+        familia, pool = _classificar_comando(comando, plano_claude, medidores)
+        if pool != "desconhecido":
+            return familia, pool
+    if pool_declarado and ferramenta_declarada.casefold() in ("antigravity", "agy", ""):
+        por_nome = {m.casefold(): m for m in medidores}
+        if pool_declarado.casefold() in por_nome:
+            pool_real = por_nome[pool_declarado.casefold()]
+            familia = "Gemini" if pool_real != "Claude and GPT models" else (
+                "Claude" if "claude" in modelo_bruto.casefold() else "GPT"
+            )
+            return familia, pool_real
+    modelo_tela = _modelo_rodape_agy(exe, agente)
+    if modelo_tela:
+        return _classificar_comando(f"agy --model {modelo_tela}", plano_claude, medidores)
     return "desconhecido", "desconhecido"
 
 
@@ -402,7 +466,7 @@ def avaliar_equilibrio(exe, formacao, secoes, pools):
     comandos, aceitas, retencoes = {}, {}, []
     for secao in secoes:
         agente, ident = secao["agente"], secao["id"] or "-"
-        familia, pool = pool_do_destino(exe, formacao.get(agente, {}), plano_claude, medidores, comandos)
+        familia, pool = pool_do_destino(exe, formacao.get(agente, {}), plano_claude, medidores, comandos, agente)
         motivo = next((m.group(1).strip() for linha in secao["linhas"] if (m := RE_MOTIVO_POOL.match(linha))), None)
         cota = por_pool.get(pool)
         if pool == "desconhecido":
@@ -412,6 +476,14 @@ def avaliar_equilibrio(exe, formacao, secoes, pools):
                 print(f"aviso: {agente} | {ident}: {pool} sem leitura fresca ou verificável")
             elif menor is None:
                 print(f"aviso: {agente} | {ident}: sem pool pago elegível para comparação")
+            elif familia == "Gemini":
+                if _gemini_apertado(cota) and motivo is None:
+                    retencoes.append(
+                        f"RETIDO (equilíbrio): {agente} | {ident}: {pool} {round(cota['uso_max'])}% "
+                        f"(Gemini apertado: semanal ≥{LIMIAR_GEMINI_SEMANAL}% ou 5h ≥{LIMIAR_GEMINI_5H}%; "
+                        f"menor {nome_pool(menor)} {round(menor['uso_max'])}%); reencaminhe ou justifique com 'Motivo pool:'"
+                    )
+                    continue
             elif cota["uso_max"] - menor["uso_max"] >= LIMIAR_EQUILIBRIO and motivo is None:
                 retencoes.append(
                     f"RETIDO (equilíbrio): {agente} | {ident}: {pool} {round(cota['uso_max'])}% vs "

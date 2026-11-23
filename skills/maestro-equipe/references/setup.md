@@ -66,9 +66,9 @@ Proponha, confirme e anote em `.maestri/equipe.md` pelo menos um terminal de cad
 | Claude | Haiku 5.5 medium | Haiku | Batedor no Claude Code (shell, conversão, abertura de URL, verificação de fonte) quando o Pro não estiver retido |
 | Claude | Sonnet 5.5 medium | Agy Sonnet | Volume, Volume de cuidado, revisão quando autor ≠ Claude e o equilíbrio permite, QA visual (no Antigravity) |
 | Claude | Opus 5.5 high | Agy Opus | Redação de registro formal, Crítico N3 e voz Claude do Conselho N4 (no Antigravity) |
-| Gemini | Hydrogen high (low/medium em N0–N1 via `--command`) ou Flash low | Agy Hydrogen (ou Agy Flash após medidor confirmado) | Batedor N0–N1 compatível com Antigravity, Volume de código, UI especificada e pesquisa ampla |
-| Gemini | Argon high (medium via `--command`) | Agy Argon | Volume de cuidado e revisão de diff curto, com teto semanal próprio |
-| Gemini | Neon high (xhigh no Conselho via `--command`) | Agy Neon | Crítico N3, Revisor, QA visual e voz Gemini no Conselho N4 |
+| Gemini | Hydrogen high (low/medium em N0–N1 via `--command`) ou Flash low | Agy Hydrogen (ou Agy Flash após medidor confirmado) | Batedor N0–N1, Volume de código bem especificado, UI em lote, QA visual barato e pesquisa ampla |
+| Gemini | Argon high (medium via `--command`) | Agy Argon | Tarefa longa de cuidado (`Volume de cuidado`) e revisão de diff curto, poupando o teto semanal próprio |
+| Gemini | Neon high (xhigh no Conselho via `--command`) | Agy Neon | Trabalho importante/decisivo (N2 de risco, N3, revisão decisiva, diagnóstico difícil, edição via MCP em Lazy), QA visual e voz Gemini no Conselho N4 |
 | Abertos | OpenCode grátis | OpenCode Gratis | Batedor de custo zero: leitura, triagem, resumo e comandos/testes fechados |
 
 - **Onde rodam os modelos Claude e limite no Claude Code:** Sonnet e Opus preferem o Antigravity (`Agy Sonnet` e `Agy Opus`, pool "Claude and GPT"). No Claude Code ficam o **Haiku**, eventual terminal com `--chrome` (usado só quando o site exige a sessão logada no Chrome do usuário e nem CLI/API com shell nem o Portal do Maestri atendem) e **no máximo um produtor Claude Code generalista** quando Sonnet e Opus não puderem rodar no Antigravity, por bloqueio ou ausência do plano. Sonnet é o generalista fixo; Opus entra sob demanda (`recruit --replace` ou `--command`) e sai depois. Terminal mantido por recurso exclusivo (Chrome, SSH/LAN) não conta no limite enquanto só recebe tarefas que exigem o recurso; se receber tarefa geral, ele é o generalista. No reset, volte ao Antigravity.
@@ -137,7 +137,7 @@ Não crie band sem o usuário pedir, e não conecte produtores entre si: tudo pa
 - O papel do Antigravity leva o bloco "Antigravity" de `papeis.md` (se der access denied, rode SOMENTE o comando maestri fora do sandbox).
 - O agy abre em modo `auto` (edições e comandos seguros aprovados). Ao lançar modelo novo, aparece um banner "Introducing …"; ele some sozinho com o primeiro prompt.
 - Skills globais do agy: `~/.gemini/config/skills/` (também lê `~/.gemini/skills/`).
-- **Limites do sandbox:** o `read_file` do agy **recusa arquivos binários** (PDF, Office, zip...) e o sandbox bloqueia rodar scripts e listar pastas fora da pasta de papel. Efeito já visto: tarefa bloqueada e checagem que não rodou. Regra: converta o binário para texto em terminal com shell elegível **antes** de despachar ao Antigravity e rode scripts bloqueados **fora** dele. Texto e imagem o agy lê. Detalhe em `roteamento.md` e `prompts.md` §1.
+- **Shell, MCP e limites reais:** o agy **roda shell** (`curl`, `python`, PowerShell) no sandbox ou fora dele com aprovação do Maestro, e **usa servidores MCP** (ex.: Canva). Atenção ao carregamento MCP: o mesmo servidor pode carregar em modo **Lazy** num terminal (ex.: Neon, todas as ferramentas) e em modo **Eager** em outro (ex.: Hydrogen, cortando ferramentas maiores por limite de tamanho). O `read_file` do agy continua **recusando binários** (PDF, Office, zip...): converta binários para texto/imagem antes; texto e imagem o agy lê normalmente. Permissões do agy: `comunicacao.md` §6.
 
 ## 6. Codex
 
@@ -198,7 +198,8 @@ Sintoma: papéis citando outro projeto, presets com `--add-dir` de outra pasta, 
 | Terminal voltou ao shell após atualização | a ferramenta fechou ao atualizar | `recruit --replace` |
 | Classificador do Claude Code bloqueia `recruit --replace`, `git commit` ou push do Maestro | ação sensível no modo automático | explicar ao usuário e pedir que aprove ou rode |
 | Pergunta ao usuário some ou é respondida sozinha | aviso de produtor digitado em cima do diálogo | sem AskUserQuestion com tarefa em andamento |
-| Terminal Antigravity bloqueado ao ler PDF/Office/zip ou ao rodar script de checagem | `read_file` recusa binário e o sandbox bloqueia scripts (seção 5) | converta o binário para texto e rode a checagem em terminal com shell elegível pela matriz |
+| Terminal Antigravity bloqueado ao ler PDF/Office/zip ou fora da pasta no sandbox | `read_file` recusa binário; rede ou escrita fora da pasta de papel pede aprovação fora do sandbox | converta binários para texto em terminal com shell antes; para `curl`/Python/PowerShell no escopo, aprove a execução fora do sandbox (`comunicacao.md` §6) |
+| Antigravity MCP: `tool X is not enabled for server Y` | o servidor carregou em modo Eager naquele terminal e cortou ferramentas maiores por limite de tamanho (~10,5 KB no Canva: só as 11 menores passam) | troque para um terminal em que o servidor carregue em modo Lazy (ex.: Neon) em vez de editar a configuração; o Antigravity bloqueia ler `settings.json` e `config.json` por regra fixa |
 | Banner "Introducing …" no Antigravity | novidade de modelo | some com o primeiro prompt; não precisa de ação |
 | Produtor reporta despacho "truncado" ou o texto fica na caixa de entrada | despacho enviado enquanto o terminal abria | usar `maestri_batch.py` (espera o terminal ficar pronto e recupera o texto parado); com `maestri ask` direto, espere o prompt aparecer no `check` |
 | Relatório ou pesquisa vira instrução de projeto de repente | no Windows (e no macOS padrão) `claude.md` = `CLAUDE.md`, `agents.md` = `AGENTS.md`, `gemini.md` = `GEMINI.md`: as ferramentas carregam o arquivo como regra | nunca dê esses nomes a relatórios, pesquisas ou notas (use `anthropic.md`, `pesquisa-claude.md`...) |
