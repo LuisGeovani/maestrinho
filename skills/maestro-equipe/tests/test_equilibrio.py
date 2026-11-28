@@ -375,7 +375,7 @@ class TestEquilibrio(unittest.TestCase):
     def test_relatorio_confirma_entrega_tardia_sem_duplicar_envios(self):
         self.cotas_do_caso()
 
-        def gravar_relatorios(exe, pendentes, inicio, minutos):
+        def gravar_relatorios(exe, pendentes, inicio, minutos, **_):
             self.assertEqual(len(self.log.read_text(encoding="utf-8").splitlines()), 5)
             for caminho, _ in pendentes.values():
                 caminho.write_text("STATUS: pronto", encoding="utf-8")
@@ -396,7 +396,7 @@ class TestEquilibrio(unittest.TestCase):
         self.cotas_do_caso()
         self.despacho.write_text("### Prumo | ECO-T1-R\nTamanho: M\nConfira.\n", encoding="utf-8")
 
-        def gravar_relatorio(exe, pendentes, inicio, minutos):
+        def gravar_relatorio(exe, pendentes, inicio, minutos, **_):
             caminho, _ = pendentes["Prumo"]
             caminho.write_bytes(original.read_bytes())
             return set()
@@ -421,7 +421,7 @@ class TestEquilibrio(unittest.TestCase):
     def test_enter_com_erro_e_relatorio_novo_preserva_sucesso(self):
         self.cotas_do_caso(idade_claude=2)
 
-        def gravar_relatorios(exe, pendentes, inicio, minutos):
+        def gravar_relatorios(exe, pendentes, inicio, minutos, **_):
             self.assertNotIn("\tT5\t", self.log.read_text(encoding="utf-8"))
             for caminho, _ in pendentes.values():
                 caminho.write_text("STATUS: pronto", encoding="utf-8")
@@ -479,20 +479,6 @@ class TestEquilibrio(unittest.TestCase):
         self.assertNotIn("pool desconhecido", avisos)
         self.assertEqual(aceitas["Hydrogen"][1:3], ("Gemini", "Gemini Models"))
         self.assertEqual(aceitas["Argon"][1:3], ("Gemini", "Gemini 4 Argon"))
-
-    def test_avisar_pedido_antigravity_nao_aprova_e_deduplica(self):
-        for agente, tela_fake in (
-            ("Neon", "canva/read-design\nAllow calling this tool?\n1. Allow once\n2. Always allow"),
-            ("Hydrogen", "C:\\tmp\\a.md\nAllow access to this file?\n1. Allow\n2. Deny"),
-        ):
-            with self.subTest(agente=agente):
-                buf, avisados = Saida(), {}
-                with patch.object(batch, "tela", return_value=tela_fake), redirect_stdout(buf):
-                    batch.avisar_pedido("maestri", agente, avisados)
-                    batch.avisar_pedido("maestri", agente, avisados)  # deduplicado
-                out = buf.getvalue()
-                self.assertEqual(out.count(f"PERMISSAO pendente: {agente}"), 1)
-                self.assertIn("Allow", out)
 
     def test_equilibrio_aplica_mesmo_limiar_a_gemini_e_argon(self):
         def pools_custom(gem_sem, gem_5h, codex_sem, claude_sem):

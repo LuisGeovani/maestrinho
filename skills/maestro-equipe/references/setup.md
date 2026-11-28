@@ -197,6 +197,8 @@ Sintoma: papéis citando outro projeto, presets com `--add-dir` de outra pasta, 
 | `maestri: command not found` | CLI fora do PATH | adicionar `%LOCALAPPDATA%\Programs\Maestri\resources\cli` ao PATH, ou usar `$MAESTRI_CLI` |
 | Arquivo com caractere estranho no início | PowerShell 5.1 grava UTF-8 com BOM | o produtor remove o BOM e grava com `-Encoding utf8` (ou via Python) |
 | Terminal voltou ao shell após atualização | a ferramenta fechou ao atualizar | `recruit --replace` |
+| Terminal reiniciou sozinho e voltou ao banner da ferramenta | atualização interrompeu o despacho antes do relatório | o batch reenvia uma vez ao reconhecer o banner com o campo de entrada vazio. Se avisar de novo, confira a tela e o progresso antes de reencaminhar |
+| Pedido de permissão parou o terminal | o comando precisa de confirmação ou o menu não foi reconhecido | o batch trata pedidos de shell conforme a política da §6 de `comunicacao.md`. Se avisar `PERMISSAO pendente`, confira o comando na tela e consulte `.maestri/permissoes.log` |
 | Classificador do Claude Code bloqueia `recruit --replace`, `git commit` ou push do Maestro | ação sensível no modo automático | explicar ao usuário e pedir que aprove ou rode |
 | Pergunta ao usuário some ou é respondida sozinha | aviso de produtor digitado em cima do diálogo | sem AskUserQuestion com tarefa em andamento |
 | Terminal Antigravity bloqueado ao ler PDF/Office/zip ou fora da pasta no sandbox | `read_file` recusa binário; rede ou escrita fora da pasta de papel pede aprovação fora do sandbox | converta binários para texto em terminal com shell antes; para `curl`/Python/PowerShell no escopo, aprove a execução fora do sandbox (`comunicacao.md` §6) |

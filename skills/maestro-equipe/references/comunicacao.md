@@ -67,7 +67,9 @@ IDs: use um ID novo para cada rodada de correção (`R03-T1-C1`); continuação 
 | aviso: aprovei a confiança da pasta de papel | normal na 1ª vez de cada terminal Antigravity/Codex; nada a fazer |
 | NÃO ENVIADO, confiança de pasta fora de `.maestri/roles` | olhe com `maestri check`; aprove só se a pasta for do projeto e rode o despacho de novo só para ele |
 | relatório ANTERIOR a este despacho | o produtor não gravou o novo: `maestri check "Nome"` uma vez; use ID novo por rodada |
-| `PERMISSAO pendente: <terminal>` ou `PENDENTE, pedido de permissão` | `maestri check "Nome"`; dentro do escopo, aprove (`--raw "\r"` ou a tecla da opção; para `agy`, veja §6); fora, negue ou pergunte ao usuário |
+| `PERMISSAO aprovado/negado: <terminal>: <comando>` | o batch enviou a opção de uso único ou de recusa. Consulte `.maestri/permissoes.log` para ver a decisão |
+| `PERMISSAO pendente: <terminal>: <comando>` ou `PENDENTE, pedido de permissão` | confira a tela com `maestri check "Nome"` e decida conforme o §6. Se o envio da tecla ficou indeterminado, confirme o estado antes de tentar de novo |
+| `REINICIADO: <terminal>` | sem relatório novo, o batch reenvia o despacho original com aviso uma vez. Se outro banner de abertura aparecer após o terminal voltar a trabalhar ou mudar de versão, confira a tela e o progresso antes de reencaminhar |
 | terminou sem relatório (tela mostra outra coisa, ex.: comando do usuário) | o despacho se perdeu: confira com `git status` que nada mudou e reenvie |
 | ERRO / sem resposta em N min | `maestri check "Nome"`; se travou, `maestri recruit "Nome" --preset P --replace "Nome"` e reenvie |
 
@@ -82,15 +84,26 @@ IDs: use um ID novo para cada rodada de correção (`R03-T1-C1`); continuação 
 ## 6. Permissões dos produtores
 
 - **Aprovar (uma vez):** leitura; edição e comandos dentro das pastas da tarefa; build, teste, lint; o próprio `maestri ask` de aviso; dependência que a tarefa pediu e existe no registro oficial.
-- **Negar:** escrita fora do escopo; git feito por produtor (inclusive commit e push); pacote ou `npx` não pedido; `.env` reais, chaves, credenciais; rede para destino desconhecido; comando destrutivo; mudança de configuração global; controle do computador.
+- **Negar:** escrita fora do escopo; operações de escrita do Git por produtor (inclusive commit e push); pacote ou `npx` não pedido; `.env` reais, chaves, credenciais; rede para destino desconhecido; comando destrutivo; mudança de configuração global; controle do computador.
 - `gh` só leitura (checks, view, status) é permitido quando o despacho autoriza; `gh pr create` só se o despacho disser que o usuário autorizou aquele PR e a branch já foi enviada pelo Maestro.
 - Na dúvida, pergunte ao usuário. "Sempre permitir" só para padrões seguros e repetidos.
+
+### Destravador do batch
+
+Enquanto aguarda os relatórios, o batch sonda as telas a cada 30 s. Reconhece menus de shell por ferramenta, exige o comando completo em uma linha e aplica a allowlist e o deny de `configurar_antigravity.py`. O deny tem precedência. Para Git, o caso `-C ../../..` (raiz a partir da pasta de papel) é avaliado como o comando equivalente na raiz. Comandos ambíguos, com agrupamento do shell ou fora das listas ficam pendentes. O batch envia no máximo uma tecla por pedido visível e grava hora UTC, terminal, comando e decisão em `.maestri/permissoes.log` (JSON por linha).
+
+| Ferramenta | Pedido de shell que o batch procura | Tecla de uso único / recusa |
+|---|---|---|
+| Antigravity | menu numerado de shell fora do sandbox, como “Run this command outside the sandbox?” [não confirmado] | número da opção “Allow once” (normalmente `1`) / número de “Deny”, quando visível [texto não confirmado] |
+| Codex | “Would you like to run the following command?”, “Allow this command” ou “Approve this command” [não confirmado] | atalho mostrado na opção “Yes, proceed” ou “Allow once” / atalho mostrado em “No” ou “Deny” (`esc` vira `\e`) [não confirmado] |
+| Claude Code | “Do you want to proceed?” seguido de menu numerado [não confirmado] | número de “Yes” ou “Allow once” / número de “No” ou “Deny” [não confirmado] |
+| Outros ou desconhecido | sinal de pedido de permissão, ferramenta/MCP ou acesso a arquivo | tratamento manual após `PERMISSAO pendente` |
 
 ### Permissões no Antigravity (`agy`)
 
 - O `agy` pede permissão para quase tudo: ferramenta MCP, leitura/acesso a arquivo fora da pasta de papel e comandos fora do sandbox.
 - Não existe modo "aprovar tudo": `shift+tab` cicla apenas `auto → plan → default → accept-edits`.
-- Depois de despachar para um `agy`, o Maestro deve vigiar a tela (ou o aviso `PERMISSAO pendente: <terminal>` do `maestri_batch.py`), conferir o pedido com `maestri check "<nome>"` e aprovar o que estiver no escopo:
+- Quando receber `PERMISSAO pendente`, o Maestro pode conferir o menu com `maestri check "<nome>"` e decidir o que aprovar no escopo:
   - **Ferramenta / MCP (leitura):** `maestri ask "<nome>" --raw "2"` (sempre nesta conversa) ou `"3"` (persistir nas configurações).
   - **Ferramenta que escreve em serviço externo** (ex.: editar design no Canva, publicar): preferir `"2"` (só nesta conversa).
   - **Acesso a arquivo fora da pasta:** `maestri ask "<nome>" --raw "1"`.

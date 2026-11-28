@@ -40,6 +40,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from cotas import LIMIAR_VETO, LOG_DISTRIBUICAO, formatar_distribuicao, ler_cotas, reset_veto
+from destravar import assinatura_banner, banner_abertura, classificar_comando, pedido_permissao
 from inventario import (
     CLI_PRESET, MEDIDORES_GEMINI_CONHECIDOS, MODELO_PRESET,
     comando_da_formacao, comando_preset, ferramenta_e_pool, rodar,
@@ -196,7 +197,7 @@ RELATORIO (obrigatorio ao terminar, ou se bloquear):
    VALIDACAO: comandos rodados e resultado
    PENDENCIAS: o que falta ou depende de decisao
    VISAO: opcional, so discordancia ou risco real
-   Esse arquivo e a unica escrita permitida mesmo em tarefa SOMENTE LEITURA.
+   Grave o relatório. Outros arquivos só os que o despacho autoriza.
 2. Depois rode exatamente este comando (se nao terminou, troque a palavra pronto por parcial ou bloqueado):
    maestri ask "{maestro}" "{id} pronto: .maestri/relatorios/{id}.md"
    O aviso e curto de proposito: nada de aspas extras, barras invertidas ou texto longo nele.
@@ -289,38 +290,60 @@ def janela_pedido(texto, linhas=25):
     return None
 
 
-def avisar_pedido(exe, agente, avisados):
-    """Imprime o pedido de permissão uma única vez por pedido.
-
-    A deduplicação usa a linha que casou, não a janela inteira: spinner, relógio ou saída
-    nova ao redor mudam a cada sondagem e não podem virar spam. O aviso se rearma quando a
-    tela deixa de ter pedido, para um pedido novo ser anunciado."""
+def sondar_tela(exe, agente):
     try:
-        achado = janela_pedido(tela(exe, agente, timeout=5))
+        return RE_ANSI.sub("", tela(exe, agente, timeout=5))
     except (OSError, subprocess.TimeoutExpired):
-        return
-    if not achado:
-        avisados.pop(agente, None)
-        return
-    janela, casada = achado
-    if avisados.get(agente) == casada:
-        return
-    avisados[agente] = casada
-    print(f"PERMISSAO pendente: {agente}", flush=True)
-    for linha in janela:
-        print("   " + linha[:200], flush=True)
+        return None
 
 
-def esperar_terminar(exe, pendentes, desde, minutos):
-    """Espera, com um prazo global único, os relatórios que ainda faltam.
+def tratar_permissao(exe, agente, pedido, log):
+    decisao = classificar_comando(pedido.comando)
+    tecla = {"aprovado": pedido.aprovar, "negado": pedido.negar}.get(decisao)
+    if not tecla:
+        decisao = "pendente"
+    registro = {"hora": datetime.now(timezone.utc).isoformat(), "terminal": agente,
+                "comando": pedido.comando, "decisao": decisao}
+    try:
+        with log.open("ab", buffering=0) as saida:
+            if tecla:
+                try:
+                    retorno = subprocess.run([exe, "ask", agente, "--raw", tecla],
+                                             capture_output=True, stdin=subprocess.DEVNULL, timeout=5)
+                    if retorno.returncode != 0:
+                        decisao = "pendente"
+                except (OSError, subprocess.TimeoutExpired):
+                    decisao = "pendente"
+                if decisao == "pendente":
+                    registro.update(decisao=decisao, motivo="envio da tecla não confirmado")
+            saida.write((json.dumps(registro, ensure_ascii=False) + "\n").encode("utf-8"))
+    except OSError as exc:
+        print(f"aviso: falha ao registrar permissões em {log}: {exc}", flush=True)
+        decisao = "pendente"
+    comando = json.dumps(pedido.comando, ensure_ascii=False)[1:-1]
+    print(f"PERMISSAO {decisao}: {agente}: {comando}", flush=True)
 
-    O maestri ask --batch volta quando o agente fica quieto, não quando termina: por isso o
-    disco de todos os pendentes é conferido a cada 10 s (quem grava sai da lista) e a tela de
-    cada um que sobra é conferida a cada 30 s, anunciando pedidos de permissão sem repetir e
-    sem aprovar nada. O prazo total é minutos, não minutos por agente.
-    Devolve o conjunto de agentes que continuaram sem relatório quando estourou."""
+
+def registrar_erro_destravador(log, agente, etapa, exc, comando="[comando não identificado]"):
+    motivo = f"{type(exc).__name__}: {exc}"
+    print(f"ERRO destravador: {agente}: {etapa}: {motivo!r}", flush=True)
+    if etapa == "permissão":
+        print(f"PERMISSAO pendente: {agente}: {json.dumps(comando, ensure_ascii=False)[1:-1]}", flush=True)
+    registro = {"hora": datetime.now(timezone.utc).isoformat(), "terminal": agente, "comando": comando,
+                "decisao": "pendente", "etapa": etapa, "motivo": motivo}
+    try:
+        with log.open("ab", buffering=0) as saida:
+            saida.write((json.dumps(registro, ensure_ascii=False) + "\n").encode("utf-8"))
+    except Exception as erro_log:
+        print(f"aviso: falha ao registrar permissões em {log}: {erro_log}", flush=True)
+
+
+def esperar_terminar(exe, pendentes, desde, minutos, *, prompts, ferramentas, log, banners_anteriores=None):
+    """Sonda o disco a cada 10 s e as telas a cada 30 s, com prazo comum."""
     limite = time.time() + minutos * 60
-    faltam, avisados, proxima_tela = dict(pendentes), {}, time.time()
+    faltam, pedidos = dict(pendentes), {}
+    banners, reenviados, falhas = dict(banners_anteriores or {}), set(), set()
+    proxima_tela = time.time()
     while faltam:
         for agente, relatorio in list(faltam.items()):
             if relatorio_novo(relatorio, desde):
@@ -332,8 +355,48 @@ def esperar_terminar(exe, pendentes, desde, minutos):
             break
         if agora >= proxima_tela:
             proxima_tela = agora + 30
-            for agente in faltam:
-                avisar_pedido(exe, agente, avisados)
+            for agente, relatorio in faltam.items():
+                if agente in falhas:
+                    continue
+                etapa, pedido = "permissão", None
+                try:
+                    texto = sondar_tela(exe, agente)
+                    if not texto or not texto.strip() or relatorio_novo(relatorio, desde):
+                        continue
+                    cli = ferramentas.get(agente)
+                    pedido = pedido_permissao(texto, cli)
+                    chave = pedido.chave if pedido else None
+                    etapa = "reinício"
+                    banner = assinatura_banner(texto, cli)
+                    mudou = agente in banners and banner != banners[agente]
+                    banners[agente] = banner
+                    etapa = "permissão"
+                    chave_anterior = pedidos.get(agente)
+                    pedidos[agente] = chave
+                    if pedido:
+                        if chave != chave_anterior:
+                            tratar_permissao(exe, agente, pedido, log)
+                        continue
+                    etapa = "reinício"
+                    if (not mudou or not banner or menciona_id(texto, relatorio[0].stem)
+                            or not banner_abertura(texto, cli) or relatorio_novo(relatorio, desde)):
+                        continue
+                    if agente in reenviados:
+                        print(f"REINICIADO: {agente}: novo banner; sem reenvio automático adicional", flush=True)
+                        continue
+                    etapa = "reenvio"
+                    aviso = ("Aviso do Maestro: seu terminal reiniciou. Retome este despacho e confira "
+                             "o que já foi feito antes de editar.")
+                    prompt = prompts[agente]
+                    reenviados.add(agente)
+                    print(f"REINICIADO: {agente}: reenviando o despacho uma vez", flush=True)
+                    _, erro = enviar_um(exe, agente, aviso + "\n\n" + prompt, timeout=5)
+                    if erro:
+                        print(f"aviso: reenvio para {agente}: {erro}", flush=True)
+                except Exception as exc:
+                    falhas.add(agente)
+                    comando = pedido.comando if pedido else "[comando não identificado]"
+                    registrar_erro_destravador(log, agente, etapa, exc, comando)
         time.sleep(10)
     return set(faltam)
 
@@ -1062,12 +1125,20 @@ def main() -> int:
         return 0
 
     pasta.mkdir(parents=True, exist_ok=True)
-    bloqueios = {}
+    bloqueios, banners_anteriores = {}, {}
+    log_permissoes = pasta.parent / "permissoes.log"
 
     def conferir(agente):
         motivo = esperar_pronto(exe, agente)
         if motivo:
             bloqueios[agente] = motivo
+        elif not args.sem_rodape:
+            try:
+                texto = sondar_tela(exe, agente)
+                if texto and texto.strip():
+                    banners_anteriores[agente] = assinatura_banner(texto, ferramentas.get(agente))
+            except Exception as exc:
+                registrar_erro_destravador(log_permissoes, agente, "tela anterior ao envio", exc)
 
     threads = [threading.Thread(target=conferir, args=(a,)) for a in prompts]
     for t in threads:
@@ -1119,7 +1190,9 @@ def main() -> int:
     if pendentes:
         print(f"aguardando {', '.join(sorted(pendentes))}: até {args.espera} min no total,"
               " relatório a cada 10 s, tela a cada 30 s", flush=True)
-        sem_relatorio = esperar_terminar(exe, pendentes, inicio, args.espera)
+        sem_relatorio = esperar_terminar(exe, pendentes, inicio, args.espera, prompts=prompts,
+                                         ferramentas=ferramentas, log=log_permissoes,
+                                         banners_anteriores=banners_anteriores)
         if sem_relatorio:
             print(f"aviso: sem relatório em {args.espera} min: {', '.join(sorted(sem_relatorio))}", flush=True)
 
@@ -1153,11 +1226,19 @@ def main() -> int:
         if not args.sem_rodape and ids[agente] and arq.exists():
             print(f"== {agente} ({ident}): o relatório existente é ANTERIOR a este despacho (use um ID novo por rodada)")
         # O retorno do --batch pode ser de minutos atrás: para quem passou pela espera, a tela atual.
-        texto_out = tela(exe, agente) if agente in sem_relatorio else (out or "")
-        achado = janela_pedido(texto_out)
-        if achado:
+        try:
+            texto_out = (sondar_tela(exe, agente) or "") if agente in sem_relatorio else (out or "")
+            achado = janela_pedido(texto_out)
+            pendente = bool(achado or pedido_permissao(texto_out, ferramentas.get(agente)))
+        except Exception as exc:
+            registrar_erro_destravador(log_permissoes, agente, "permissão", exc)
+            print(f"== {agente} ({ident}): PENDENTE, confira com maestri check \"{agente}\"")
+            falhou = falhou or not args.sem_rodape
+            continue
+        if pendente:
             print(f"== {agente} ({ident}): PENDENTE, pedido de permissão na tela (maestri check \"{agente}\")")
-            print("\n".join("   " + l[:200] for l in achado[0]))
+            if achado:
+                print("\n".join("   " + l[:200] for l in achado[0]))
         else:
             cauda = [l for l in texto_out.splitlines() if l.strip() and not RE_MOLDURA.search(l.strip())][-args.linhas:]
             print(f"== {agente} ({ident}): terminou sem relatório; últimas linhas:")
