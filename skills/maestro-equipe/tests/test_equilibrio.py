@@ -621,6 +621,118 @@ class TestEquilibrio(unittest.TestCase):
         self.assertIn("SemNada | E3: modelo não identificado", avisos)
         self.assertIsNone(aceitas["SemNada"][4])
 
+    def test_rodapes_estritos_completam_formacao(self):
+        pools = self.cotas_do_caso()
+        casos = (
+            ("Codex", "GPT-6.2 Astra", "GPT-6.2 Astra · high", 960),
+            ("Codex", "-", "gpt-6.2-astra high · 95% left", 960),
+            ("Codex", "GPT-6.2 Astra", r"gpt-6.2-astra high · C:\proj", 960),
+            ("Antigravity", "Gemini 4 Neon", "Gemini 4 Neon · high", 360),
+            ("Antigravity", "-", "auto · Gemini 4 Neon · high", 360),
+            ("Claude Code", "Claude Sonnet 5.5", "Claude Sonnet 5.5 · high", 240),
+        )
+        for ferramenta, modelo, rodape, custo in casos:
+            with self.subTest(rodape=rodape):
+                self.equipe.write_text(
+                    "| Terminal | Ferramenta | Modelo |\n"
+                    "|---|---|---|\n"
+                    f"| A | {ferramenta} | {modelo} |\n",
+                    encoding="utf-8",
+                )
+                self.preset.return_value = (f"Pronto.\n  {rodape}\n", "")
+                aceitas, retidas, _ = self.avaliar(
+                    "### A | V1\nTamanho: M\nMotivo pool: teste do custo.\n", pools
+                )
+                if custo >= batch.LIMIAR_CUSTO:
+                    self.assertEqual(aceitas, {})
+                    self.assertEqual(len(retidas), 1)
+                    self.assertIn(f"RETIDO (custo): A | V1:", retidas[0])
+                    self.assertIn(f"custo {custo}", retidas[0])
+                else:
+                    self.assertEqual(retidas, [])
+                    self.assertEqual(aceitas["A"][4], custo)
+
+    def test_rodapes_capturados_e_variacoes_de_status(self):
+        pools = self.cotas_do_caso()
+        casos = (
+            ("? for shortcuts                                                                   auto · Gemini 4 Neon · high", 120),
+            ("esc to cancel                                                                 auto · Gemini 4 Hydrogen · high", 60),
+            (
+                r"  GPT-6-Luna high · ~\Documents\Desenvolvimento Web\maestrinho\.maestri\roles\3d646786-047a-49c4-b2b6-"
+                "\n  32a4d1450c0f",
+                4,
+            ),
+            (
+                r"  GPT-6.2-Sol medium · ~\Documents\Desenvolvimento Web\maestrinho\.maestri\roles\8b1120c0-f14f-4479-a645-"
+                "\n  e8edfc99891c · Revise a implementação ECO-T3",
+                40,
+            ),
+            ("  ┃  Build · DeepSeek V4.1 Flash Free OpenCode", 0),
+            (r"gpt-6.2-sol medium · C:\proj · 98% left", 40),
+            (r"gpt-6.2-sol medium · 98% context left · C:\proj", 40),
+            ("Gemini 4 Neon (High)  auto mode  shift+tab", 120),
+        )
+        for rodape, custo in casos:
+            with self.subTest(rodape=rodape):
+                self.preset.return_value = (rodape, "")
+                aceitas, retidas, _ = self.avaliar("### A | C1\nTamanho: P\n", pools)
+                self.assertEqual(retidas, [])
+                self.assertEqual(aceitas["A"][4], custo)
+
+    def test_rodape_claude_sem_modelo_depende_da_formacao(self):
+        pools = self.cotas_do_caso()
+        self.preset.return_value = ("⏵⏵ auto mode on (shift+tab to cycle)", "")
+        for modelo, custo in (("-", None), ("Claude Sonnet 5.5 · medium", 40)):
+            with self.subTest(modelo=modelo):
+                self.equipe.write_text(
+                    "| Terminal | Ferramenta | Modelo · effort |\n"
+                    "|---|---|---|\n"
+                    f"| A | Claude Code | {modelo} |\n",
+                    encoding="utf-8",
+                )
+                aceitas, retidas, avisos = self.avaliar(
+                    "### A | C1\nTamanho: P\nMotivo pool: teste do custo.\n", pools
+                )
+                self.assertEqual(retidas, [])
+                self.assertEqual(aceitas["A"][4], custo)
+                if custo is None:
+                    self.assertIn("modelo não identificado", avisos)
+
+    def test_rodape_de_outro_modelo_nao_completa_effort(self):
+        self.equipe.write_text(
+            "| Terminal | Ferramenta | Modelo |\n"
+            "|---|---|---|\n"
+            "| A | Codex | GPT-6.2 Astra |\n",
+            encoding="utf-8",
+        )
+        pools = self.cotas_do_caso()
+        for rodape in ("gpt-6.2-sol high · 95% left", "GPT-6.1 Astra · high"):
+            with self.subTest(rodape=rodape):
+                self.preset.return_value = (f"{rodape}\n", "")
+                aceitas, retidas, avisos = self.avaliar("### A | V1\nTamanho: M\n", pools)
+                self.assertEqual(retidas, [])
+                self.assertIsNone(aceitas["A"][4])
+                self.assertIn("effort não identificado para astra", avisos)
+
+    def test_marcadores_de_status_na_conversa_nao_identificam_modelo(self):
+        pools = self.cotas_do_caso()
+        telas = (
+            "Sugestao: use GPT-6.2 Astra high\nmodelo indisponivel\n",
+            "Relato: GPT-6.2 Astra high\nsol medium\n",
+            "Sugestao: use GPT-6.2 Astra high e shift+tab\nmodelo indisponivel\n",
+            "Exemplo: auto · Gemini 4 Neon · high\nshift+tab\n",
+            "Explique ? for shortcuts                      auto · Gemini 4 Neon · high\n",
+            "Exemplo: GPT-6-Luna high · ~/projeto · título\n",
+        )
+        for tela in telas:
+            with self.subTest(tela=tela):
+                self.preset.return_value = (tela, "")
+                aceitas, retidas, avisos = self.avaliar("### A | V1\nTamanho: M\n", pools)
+                self.assertEqual(retidas, [])
+                self.assertEqual(aceitas["A"][1:3], ("desconhecido", "desconhecido"))
+                self.assertIsNone(aceitas["A"][4])
+                self.assertIn("modelo não identificado", avisos)
+
     def test_resumo_real_mostra_custo_de_todas_secoes_e_aviso_tamanho_p(self):
         self.cotas_do_caso()
         # Inclui Tocha (retida por equilíbrio) e Ferro (falha no envio) e 4 caminhos em Tamanho: P
@@ -812,6 +924,52 @@ class TestEquilibrio(unittest.TestCase):
         linhas_log = [l.split("\t") for l in self.log.read_text(encoding="utf-8").splitlines()]
         self.assertEqual(len(linhas_log), 1)
         self.assertEqual(linhas_log[0][2:9], ["SolLM", "GPT", "Codex (conta lm)", "", "120", "M", "0"])
+
+    def test_mostrar_com_maestro_usa_a_mesma_conta_codex(self):
+        self.equipe.write_text(
+            "| Terminal | Ferramenta | Modelo · effort |\n"
+            "|---|---|---|\n"
+            "| SolLM | Codex | GPT-6.2 Sol · medium |\n",
+            encoding="utf-8",
+        )
+        self.despacho.write_text(
+            "### SolLM | T1\nTamanho: M\nValide com: pytest\n",
+            encoding="utf-8",
+        )
+        padrao = next(p for p in self.cotas_do_caso() if p["provedor"] == "Codex")
+        pools = [dict(padrao, uso_max=85), dict(padrao, provedor="lm", conta="lm", uso_max=0)]
+        listagem = 'Connected agents:\n  - name: "SolLM", cli: "codex", account: "lm"\n'
+        argv = ["maestri_batch.py", str(self.despacho), "--raiz", str(self.raiz), "--mostrar", "--sem-rodape"]
+        previas = []
+        with (patch.object(batch, "maestri_exe", return_value="maestri"),
+              patch.object(batch, "ler_cotas", return_value=(pools, [])),
+              patch.object(batch, "ler_list", return_value=("Maestro", {"SolLM"}, listagem)),
+              patch.object(batch, "enviar_tudo") as enviar):
+            for flags in ([], ["--maestro", "Maestro"]):
+                saida = Saida()
+                with patch.object(sys, "argv", argv + flags), redirect_stdout(saida):
+                    self.assertEqual(batch.main(), 0)
+                previas.append(saida.getvalue())
+            enviar.assert_not_called()
+        self.assertEqual(previas[0], previas[1])
+        self.assertIn("===== SolLM", previas[1])
+        self.assertIn("custo 120 (M)", previas[1])
+        self.assertNotIn("RETIDO (equilíbrio)", previas[1])
+        self.assertFalse(self.log.exists())
+
+        formacao = self.equipe.read_text(encoding="utf-8")
+        self.equipe.write_text(formacao.replace("| Codex |", "| Codex (conta lm) |"), encoding="utf-8")
+        saida = Saida()
+        falha_list = subprocess.CompletedProcess(["maestri", "list"], 1, b"", b"indisponivel")
+        with (patch.object(sys, "argv", argv + ["--maestro", "Maestro"]),
+              patch.object(batch, "maestri_exe", return_value="maestri"),
+              patch.object(batch, "ler_cotas", return_value=(pools, [])),
+              patch.object(batch.subprocess, "run", return_value=falha_list),
+              redirect_stdout(saida)):
+            self.assertEqual(batch.main(), 0)
+        self.assertIn("usando as contas da formação", saida.getvalue())
+        self.assertIn("===== SolLM", saida.getvalue())
+        self.assertNotIn("RETIDO (equilíbrio)", saida.getvalue())
 
 
 if __name__ == "__main__":

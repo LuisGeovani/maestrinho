@@ -94,28 +94,34 @@ RE_MODELO_PESO = re.compile(
     r"\b(orchestrator|luna|haiku|flash|terra|hydrogen|argon|sol|sonnet|neon|opus|astra|fable)\b",
     re.I,
 )
-RE_EFFORT = re.compile(r"\b(xhigh|low|medium|high|max|ultra)\b", re.I)
-RE_MODELO_TELA = re.compile(
-    r"\b(gemini[-\s]\d+(?:\.\d+)?[-\s](?:neon|hydrogen|argon|flash|carbon)"
+EFFORT_RODAPE = "|".join(PESOS_EFFORT)
+RE_EFFORT = re.compile(rf"\b({EFFORT_RODAPE})\b", re.I)
+MODELO_AGY = (
+    r"gemini[-\s]\d+(?:\.\d+)?[-\s](?:neon|hydrogen|argon|flash|carbon)"
     r"|gemini-pro-orchestrator-(?:neon|g1-pro)"
-    r"|claude[-\s]+(?:opus|sonnet|haiku|fable)(?:[-\s]+\d+(?:\.\d+)?)?"
-    r"|gpt[-\s]+\d+(?:\.\d+)?[-\s]+(?:luna|terra|sol|astra)"
-    r"|(?:opencode/)?[^\s]+-free)\b",
-    re.I,
 )
-RE_MARCADOR_RODAPE = re.compile(
-    r"(?:shift\+tab|for shortcuts|auto mode|accept edits|bypass permissions|"
-    r"esc to interrupt|context left|\d+%\s*left|\b(?:Build|Plan)\s*·|\bctrl\+\w)",
-    re.I,
+MODELO_CODEX_RODAPE = r"gpt[-\s]+\d+(?:\.\d+)?[-\s]+(?:luna|terra|sol|astra)"
+MODELO_CLAUDE = r"claude[-\s]+(?:opus|sonnet|haiku|fable)(?:[-\s]+\d+(?:\.\d+)?)?"
+MODELO_RODAPE = rf"{MODELO_AGY}|{MODELO_CODEX_RODAPE}|{MODELO_CLAUDE}|[\w./-]+-free"
+RE_MODELO_TELA = re.compile(rf"\b(?:{MODELO_RODAPE})\b", re.I)
+CONTEXTO_CODEX_RODAPE = r"\d+%\s+(?:context\s+)?left"
+CAMINHO_CODEX_RODAPE = r"(?:[a-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|/|\\\\)[^·]*"
+RE_RODAPES = (
+    re.compile(rf"({MODELO_RODAPE})\s*·\s*({EFFORT_RODAPE})", re.I),
+    re.compile(
+        rf"(?:\? for shortcuts\s{{2,}}|esc to cancel\s{{2,}})?"
+        rf"auto\s*·\s*({MODELO_AGY})\s*·\s*({EFFORT_RODAPE})",
+        re.I,
+    ),
+    re.compile(rf"({MODELO_AGY})\s+\(({EFFORT_RODAPE})\)\s+auto(?:\s+mode)?(?:\s+shift\+tab)?", re.I),
+    re.compile(
+        rf"({MODELO_CODEX_RODAPE})\s+({EFFORT_RODAPE})\s*·\s*"
+        rf"(?:{CONTEXTO_CODEX_RODAPE}|(?:{CONTEXTO_CODEX_RODAPE}\s*·\s*)?"
+        rf"{CAMINHO_CODEX_RODAPE}(?:\s*·\s*[^·]+)*)",
+        re.I,
+    ),
 )
-RE_STATUS_AGY_AUTO = re.compile(
-    r"\((?:xhigh|low|medium|high|max|ultra)\)\s+auto\b",
-    re.I,
-)
-RE_STATUS_CODEX_RODAPE = re.compile(
-    r"\bgpt-\d+(?:\.\d+)?-(?:luna|terra|sol|astra)\b[^·\n]*\b(?:xhigh|low|medium|high|max|ultra)\b\s*·",
-    re.I,
-)
+RE_RODAPE_OPENCODE_GRATIS = re.compile(r"┃\s+Build\s*·\s*[\w. -]+\s+Free\s+OpenCode", re.I)
 RE_URL = re.compile(r"\b(?:https?|file)://\S+", re.I)
 RE_CAMINHO_BARRA = re.compile(r"(?<![:\w])(?:[A-Za-z]:[\\/]|\.{1,2}[\\/]|[\w.-]+[\\/])[\w.@-]+(?:[\\/][\w.@-]+)*[\\/]?")
 RE_ARQUIVO_EXT = re.compile(
@@ -153,11 +159,7 @@ RE_DESTINO_REJEITADO = re.compile(
 )
 RE_FERRAMENTA = re.compile(r"\b(codex|claude(?: code)?|antigravity|agy|opencode)\b", re.I)
 RE_MODELO_CODEX = re.compile(r"\bgpt-\d+(?:\.\d+)?-(?:luna|terra|sol|astra)\b", re.I)
-RE_MODELO_AGY_TELA = re.compile(
-    r"\b(gemini[-\s]\d+(?:\.\d+)?[-\s](?:neon|hydrogen|argon|flash|carbon)"
-    r"|gemini-pro-orchestrator-(?:neon|g1-pro))\b",
-    re.I,
-)
+RE_MODELO_AGY_TELA = re.compile(MODELO_AGY, re.I)
 RE_METADADOS = re.compile(r'\b(?:tool|cli|agent[_ ]?type|ferramenta|preset|model)\s*:\s*("[^"]+"|[^,|]+)', re.I)
 RE_TELA_CODEX = re.compile(r"^(?:[^\w\n]|_)*(?:OpenAI Codex\b|Ask Codex\b)", re.I | re.M)
 RE_ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
@@ -332,10 +334,13 @@ def maestri_exe():
     return exe
 
 
-def ler_list(exe):
+def ler_list(exe, *, obrigatoria=True):
     p = subprocess.run([exe, "list"], capture_output=True, stdin=subprocess.DEVNULL)
     saida = p.stdout.decode("utf-8", "replace")
     if p.returncode != 0:
+        if not obrigatoria:
+            print("aviso: maestri list indisponível na prévia, usando as contas da formação")
+            return None, set(), ""
         print(f"ERRO em maestri list (código {p.returncode}): {p.stderr.decode('utf-8', 'replace').strip()}")
         print("Dica: rode `maestri debug`.")
         sys.exit(2)
@@ -485,29 +490,25 @@ def _ler_tela_limpa(exe, agente, telas):
     return telas[agente]
 
 
-def _eh_linha_rodape(linha):
-    return bool(
-        RE_MARCADOR_RODAPE.search(linha)
-        or (RE_MODELO_TELA.search(linha) and RE_STATUS_AGY_AUTO.search(linha))
-        or RE_STATUS_CODEX_RODAPE.search(linha)
-    )
-
-
-def _linhas_rodape(limpa):
-    """Retorna apenas as linhas finais da tela que correspondem a uma barra de status reconhecível."""
-    if not limpa:
-        return []
-    cauda = [l for l in limpa.splitlines() if l.strip()][-6:]
-    return [l for l in cauda if _eh_linha_rodape(l)]
+def _pares_rodape(limpa):
+    """Lê pares em linhas de status completas, da última para a primeira."""
+    cauda = [linha.strip() for linha in limpa.splitlines() if linha.strip()][-6:]
+    for linha in reversed(cauda):
+        if RE_RODAPE_OPENCODE_GRATIS.fullmatch(linha):
+            yield "opencode grátis", None
+            continue
+        for formato in RE_RODAPES:
+            if par := formato.fullmatch(linha):
+                yield par.group(1), par.group(2).lower()
+                break
 
 
 def _modelo_rodape_agy(exe, agente, telas=None):
     """Lê o modelo Gemini no rodapé da tela do Antigravity (via `maestri check`)."""
     limpa = _ler_tela_limpa(exe, agente, telas if telas is not None else {})
-    for linha in reversed(_linhas_rodape(limpa)):
-        achados = RE_MODELO_AGY_TELA.findall(linha)
-        if achados:
-            return re.sub(r"[^\w]+", "-", achados[-1].casefold()).strip("-")
+    for modelo, _ in _pares_rodape(limpa):
+        if RE_MODELO_AGY_TELA.fullmatch(modelo):
+            return re.sub(r"[^\w]+", "-", modelo.casefold()).strip("-")
     return ""
 
 
@@ -529,16 +530,13 @@ def _extrair_effort(texto):
     return m.group(1).lower() if m else None
 
 
-def _modelo_effort_tela(limpa):
-    """Extrai (modelo_peso, effort) apenas de uma linha de rodapé reconhecível."""
-    for linha in reversed(_linhas_rodape(limpa)):
-        achados = list(RE_MODELO_TELA.finditer(linha))
-        if achados:
-            return _extrair_modelo_peso(achados[-1].group(0)), _extrair_effort(linha)
-        modelo = _extrair_modelo_peso(linha)
-        if modelo is not None:
-            return modelo, _extrair_effort(linha)
-    return None, None
+def _mesmo_modelo(formacao, rodape):
+    """Compara o identificador completo quando a formação informa a versão."""
+    if modelo := RE_MODELO_TELA.search(formacao):
+        declarado = re.sub(r"[-\s]+", "-", modelo.group().casefold())
+        exibido = re.sub(r"[-\s]+", "-", rodape.casefold())
+        return declarado == exibido
+    return _extrair_modelo_peso(formacao) == _extrair_modelo_peso(rodape)
 
 
 def _caminhos_distintos(linhas):
@@ -604,6 +602,8 @@ def destino_do_agente(exe, linha, plano_claude, medidores, comandos, telas, agen
     modelo_col = linha.get("modelo") or next((v for k, v in linha.items() if k.startswith("modelo")), "")
     effort_col = linha.get("effort", "").strip()
     modelo_bruto = re.split(r"[·,]", re.sub(r"\s*\([^)]*\)", "", modelo_col))[0].strip()
+    if modelo_bruto in ("-", "–", "—"):
+        modelo_bruto = ""
     pool_declarado = re.sub(r"\s*\([^)]*\)", "", linha.get("pool", "")).strip()
     comando, ferramenta_declarada, preset = "", "", ""
     achado = RE_PRESET_FORMACAO.match(ferr_sem_conta)
@@ -642,23 +642,21 @@ def destino_do_agente(exe, linha, plano_claude, medidores, comandos, telas, agen
             familia, pool = _classificar_comando(f"agy --model {modelo_tela}", plano_claude, medidores)
 
     eh_opencode = ferramenta_declarada.casefold() == "opencode" or pool == "grátis" or familia == "aberto"
-    texto_modelo_formacao = modelo_col.strip() or (
-        MODELO_PRESET.search(comando).group(1) if MODELO_PRESET.search(comando) else ""
-    )
-    modelo_nome = (
-        _extrair_modelo_peso(texto_modelo_formacao, opencode=eh_opencode, pool=pool)
-        if texto_modelo_formacao else None
-    )
+    modelo_preset = MODELO_PRESET.search(comando)
+    texto_modelo_formacao = modelo_bruto or (modelo_preset.group(1) if modelo_preset else "")
+    modelo_nome = _extrair_modelo_peso(texto_modelo_formacao, opencode=eh_opencode, pool=pool)
     effort_nome = _extrair_effort(f"{modelo_col} {effort_col}") or _extrair_effort(comando)
 
     falta_modelo = not texto_modelo_formacao
     falta_effort = effort_nome is None and modelo_nome != "opencode grátis"
     if falta_modelo or falta_effort:
         limpa = _ler_tela_limpa(exe, agente, telas)
-        modelo_tela, effort_tela = _modelo_effort_tela(limpa)
+        modelo_tela, effort_tela = next(_pares_rodape(limpa), ("", None))
         if falta_modelo:
-            modelo_nome = modelo_tela or ("opencode grátis" if eh_opencode else None)
-        if effort_nome is None:
+            modelo_nome = _extrair_modelo_peso(modelo_tela) or ("opencode grátis" if eh_opencode else None)
+        if effort_nome is None and effort_tela and (
+            falta_modelo or _mesmo_modelo(texto_modelo_formacao, modelo_tela)
+        ):
             effort_nome = effort_tela
         if pool == "desconhecido" and modelo_nome in ("luna", "terra", "sol", "astra"):
             familia, pool = "GPT", "Codex"
@@ -1010,10 +1008,8 @@ def main() -> int:
     pasta = raiz / ".maestri" / "relatorios"
 
     exe = maestri_exe()
-    maestro, conectados, listagem = args.maestro, set(), ""
-    if not (args.mostrar and args.maestro):
-        achado, conectados, listagem = ler_list(exe)
-        maestro = args.maestro or achado
+    achado, conectados, listagem = ler_list(exe, obrigatoria=not (args.mostrar and args.maestro))
+    maestro = args.maestro or achado
     if not maestro:
         print("ERRO: não achei o seu nome em `maestri list` (seção You:). Passe --maestro \"Nome\".")
         return 2
