@@ -14,7 +14,7 @@ Nomes e IDs mudam rápido. Antes de criar presets, confira com `python <skill>/s
 | Gemini | **Gemini 3.8 Flash** | triagem e classificação N0 de texto já convertido | agente de terminal, código e verificação de fonte/fato |
 | | **Hydrogen** | código e UI bem especificados em lote, lógica difícil em `high`, QA visual correto e barato, pesquisa ampla, comandos com aprovação | escopo vago e servidor MCP grande em modo Eager (corte por tamanho de schema) |
 | | **Argon** | tarefa longa, redação ou engenharia cuidadosa em `medium`, diff curto | N3 de risco alto |
-| | **Neon** | mais forte do Gemini: N3, diagnóstico amplo, edição via MCP (modo Lazy), revisão de diff e de texto, QA visual, multimodal | trivial, `high` sem motivo e `xhigh` sem ganho real |
+| | **Neon** | qualidade máxima da linha Gemini (peso 30): N3, diagnóstico amplo, edição via MCP (modo Lazy), revisão de diff e de texto, QA visual, multimodal | trivial, `high` sem motivo e `xhigh` sem ganho real |
 | GPT | **Luna** | script, configuração e checagem N0–N1 com passos fechados e teste automático obrigatório | engenharia aberta, redação e verificação de fonte/fato |
 | | **Terra** | escrita rápida, resumo, conversão de formato e visão | código difícil |
 | | **Sol** | degrau médio GPT: código por especificação, revisão de diff e verificação com shell e prova bruta | tarefa sem critério de aceite e N0–N1 que cabem em Luna ou Terra |
@@ -24,21 +24,21 @@ Nomes e IDs mudam rápido. Antes de criar presets, confira com `python <skill>/s
 
 Os abertos são a quarta família para roteamento. O catálogo de OpenCode abaixo detalha as opções. O pool "Claude and GPT" do Antigravity atende Agy Sonnet e Agy Opus. Hydrogen e Neon usam "Gemini Models", Argon tem teto semanal próprio e os quatro GPT compartilham o medidor Codex. O Gemini 3.8 Flash tem medidor desconhecido até confirmação do vínculo no provedor. Só use a folga de "Gemini Models" para ele se esse vínculo for confirmado.
 
-A qualidade relativa de Argon × Neon e Argon × Sonnet segue sem medida `[incerto]`. **Divisão interna do Gemini:** avalie sempre o par `modelo × effort` pelo custo por entrega (`roteamento.md`). **Neon** continua o mais forte do plano Pro, começando em `medium` e subindo para `high` por motivo escrito; **Hydrogen** cobre volume bem especificado (código/UI em lote, Batedor, QA visual barato, pesquisa) e lógica/depuração difícil em `high` antes de subir degrau; **Argon** cobre tarefa longa de cuidado em `medium`, poupando seu teto semanal próprio. Veja a matriz e as regras de cota em `roteamento.md`.
+A qualidade relativa de Argon × Neon e Argon × Sonnet segue sem medida `[incerto]`. **Custo, qualidade e cota nos modelos Gemini:** avalie sempre o par `modelo × effort` pelo custo por entrega (`roteamento.md`). **Hydrogen** (peso 15) entrega volume bem especificado (código/UI em lote, Batedor, QA visual, pesquisa) e lógica/depuração difícil em `high` pelo menor custo; **Argon** (peso 15, teto semanal próprio) fica para tarefa longa de cuidado em `medium` para preservar sua cota separada; **Neon** (peso 30, qualidade máxima da linha Gemini) entra quando o aceite pede julgamento/contexto amplo ou MCP Lazy (`medium` como base, `high` com motivo escrito). Veja a matriz e as regras de cota em `roteamento.md`.
 
 ## Peso do par modelo × effort `[incerto]`
 
-Custo estimado por despacho: **`peso do modelo × effort × tamanho`** (valores `[incerto]` até medição real em `.maestri/distribuicao.log`). `high` em modelo leve (ex.: `Luna high` P = 4; `Hydrogen high` M = 180) costuma custar menos que subir degrau; `custo ≥ 300` exige par descartado com motivo na linha `Roteamento:` (`roteamento.md` §4).
+Custo estimado por despacho: **`peso do modelo × effort × tamanho`** (valores `[incerto]` até medição real em `.maestri/distribuicao.log`). `high` em modelo leve (ex.: `Luna high` P = 4; `Hydrogen high` M = 180) costuma custar menos que subir degrau. No mínimo apto sem conflito basta `mínimo apto` em `Roteamento:`; `custo ≥ 300` ou alternativa real em conflito exige `descartado: <par> porque <motivo>` (`roteamento.md` §4).
 
 | Dimensão | Pesos `[incerto]` |
 |---|---|
 | **Modelo** | OpenCode grátis `0` · Luna / Haiku / Flash `1` · Terra `10` · Hydrogen `15` · Argon `15` · Sol / Sonnet `20` · Neon `30` · Opus `40` · Astra / Fable `80` |
 | **Effort** | `low` `1` · `medium` `2` · `high` `4` · `xhigh` `8` · `max` / `ultra` `16` |
-| **Tamanho** | `P` `1` (1 arquivo e até ~50 linhas) · `M` `3` (2–3 arquivos ou até ~200 linhas) · `G` `9` (acima disso: quebrar antes de despachar) |
+| **Tamanho** (alteração; leitura à parte) | `P` `1` (1 arquivo e até ~50 linhas) · `M` `3` (2–3 arquivos ou até ~200 linhas) · `G` `9` (implementação: quebrar; consulta indivisível: só com motivo) |
 
 ## Claude (Opus e Sonnet: PRIMEIRO no Antigravity, pool "Claude and GPT"; SÓ DEPOIS no Claude Code)
 
-Gemini é a família preferida por padrão (cota enche bem mais devagar). Claude entra quando a ferramenta exige (`--chrome`), quando o pool Gemini estiver apertado (semanal ≥ 80% ou 5 h ≥ 90%), ou quando a revisão cruzada pedir outra família. Na família Claude, use primeiro Agy Sonnet / Agy Opus no medidor "Claude and GPT". Com esse medidor bloqueado (ou quando a tarefa exigir `--chrome`), os candidatos Claude entram na comparação pela folga do Claude Pro (que inclui o Maestro) e a trava de equilíbrio de `roteamento.md` §4 vale para eles; volte ao Antigravity no reset.
+A escolha de família é imparcial (árvore de decisão no `SKILL.md`). A **única regra parcial** só ordena dentro da família Claude depois que Claude foi escolhido (não desempata o passo 4): o modelo pedido roda no Antigravity (`Agy Sonnet` / `Agy Opus`, pool "Claude and GPT", com shell sob aprovação) se ele existir lá e houver cota. **Haiku** (não existe no Antigravity) e recursos exclusivos (`--chrome`) vão direto ao Claude Code (Claude Pro utilizável, < 95% e sem veto); Sonnet/Opus só vão ao Claude Code se "Claude and GPT" estiver vetado/indisponível e o Pro estiver utilizável, sujeitos à mesma trava de equilíbrio de `roteamento.md` §4 (volte ao Antigravity no reset).
 
 | Modelo | Bom em | Evite | Effort |
 |---|---|---|---|
