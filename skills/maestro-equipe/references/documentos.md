@@ -68,6 +68,7 @@ Pergunta, visões por família, síntese do Maestro, decisão do usuário (vira 
 
 ## Resultado
 Status de cada tarefa, ajustes, VISÃO registrada, commits.
+- **Aceite de primeira (por nível N0–N4):** `Aceite de primeira: X/Y tarefas aprovadas na 1ª revisão; custo estimado total (inclui correções) por tarefa aceita` (separado por nível; listar pendentes à parte).
 ```
 
 ## Relatório do produtor (`.maestri/relatorios/<ID>.md`)
@@ -91,6 +92,29 @@ Contratos e tipos: <onde estão>
 Comandos: build <...> · teste <...> · lint <...>
 Fatos confirmados: <...>
 Riscos e dúvidas: <...>
+```
+
+## Pacote de retomada (`.maestri/contexto/<ID>-retomada.md`, ≤ 15 linhas)
+
+Regra: o Maestro gera o pacote ao trocar/reiniciar terminal ou ao continuar um parcial; o produtor novo lê só o pacote e os arquivos citados.
+
+```
+RETOMADA <ID>
+Despacho de origem: .maestri/despachos/<rodada>.md (<ID>)
+Última etapa confirmada: <etapa> · Evidência: <comando/saída ou relatório>
+Arquivos tocados: <caminho: alteração em 1 linha>
+Pendência: <o que falta>
+Próximo passo autorizado: <ação/comando permitido e escopo>
+```
+
+## Lições por recorrência (`.maestri/contexto/licoes.md`)
+
+Quando o mesmo erro aparecer em 2 tarefas, registre em 1 linha cada (gatilho, correção e IDs); o despacho cita **só a lição aplicável**.
+
+```markdown
+- [Gatilho: papel exige leitura obrigatória de AGENTS.md] → Correção: marcar AGENTS.md/CLAUDE.md/GEMINI.md como opcionais no papel para não bloquear produtores (IDs: sessão atual).
+- [Gatilho: rodapé do despacho contradiz o corpo sobre escrita/entrega] → Correção: validar coerência entre corpo e rodapé antes do envio (IDs: MKT-T3).
+- [Gatilho: despacho pede ao revisor prova que só o Maestro pode coletar] → Correção: o Maestro coleta e fornece o insumo no despacho antes da revisão (IDs: sessão atual).
 ```
 
 ## `docs/contratos/README.md`

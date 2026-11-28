@@ -10,7 +10,7 @@ Todos participam, mas **ninguém é chamado por chamar**: uma etapa só existe s
 | Especificar | Arquiteto (`Neon` / `Sol` / `Sonnet medium`; `high` só sob demanda com raciocínio + contexto amplo) | contrato curto + tabela de casos + quebra em fatias `P`/`M` em `docs/contratos/` ou no contexto | N0–N1; ou quando já há contrato claro (≤ 3 arquivos e ≤ 200 linhas de alteração) |
 | Implementar | Volume ou Crítico (em fatias `P`/`M`) | código + validação rodada | — |
 | Testar | outra família que o autor | testes que falham antes e passam depois | N0–N2 (o autor valida com comando) |
-| Revisar | Revisor (família ≠ autor, em `medium`) | "aprovado" ou até 5 apontamentos com arquivo, trecho e correção | N0; N1 sem lógica nem UI |
+| Revisar | Revisor (família ≠ autor, em `medium`) | "aprovado" ou até 5 apontamentos com arquivo, trecho, correção e passagem (1ª escopo / 2ª qualidade) | N0; N1 sem lógica nem UI |
 | QA visual | QA visual (`Terra` / `Hydrogen` / `Argon` / `Sonnet` / `Neon`, menor par apto) | prints no portal (390×844 e 1280) + lista de problemas | sem UI |
 | Consolidar | Batedor | 1 arquivo com o resultado de várias fontes ou terminais | quando há 1 fonte só |
 | Integrar | Maestro | conferência de escopo + commit | nunca |
@@ -45,7 +45,7 @@ Aplique a árvore de decisão do `SKILL.md` e a matriz de `roteamento.md` para e
 
 ## Padrões de colaboração
 
-- **Par autor + revisor (N2+):** o despacho do autor já diz quem revisa; o revisor recebe o caminho do relatório do autor e um checklist (a), (b), (c). O mesmo defeito **mantém o ID** nas correções (`<ID>-C1`, `-C2` — nunca troque o ID para reiniciar a contagem).
+- **Par autor + revisor (N2+):** o despacho do autor já diz quem revisa; o revisor recebe o caminho do relatório do autor e um checklist em **2 passagens** pelo mesmo revisor: **1ª passagem — aderência à especificação** (cada requisito → evidência; faltou ou inventou algo?), **2ª passagem — qualidade do código** (só depois da 1ª). O relatório diz qual passagem (`[P1]` ou `[P2]`) achou cada problema. O mesmo defeito **mantém o ID** nas correções (`<ID>-C1`, `-C2` — nunca troque o ID para reiniciar a contagem).
 - **Verificação pós-correção (N2+ de risco alto):** depois do `<ID>-C1`, o revisor original faz uma verificação curta (`<ID>-V1`, só leitura): "cada apontamento aceito foi resolvido? sobrou ou nasceu algo?". Devolve aprovado ou só o que restou. É nessa verificação que o Maestro decide entre aceitar, adiar como pendência para o usuário ou abrir nova correção (`<ID>-C2`) com motivo de risco explícito. Em risco baixo, a conferência do Maestro por `git diff --stat` basta.
 - **Teste por terceiro (N3):** só com especificação executável. Ordem: interfaces e stubs → testes (falham) → implementação.
 - **Red team:** só quando o cartão marca risco (segurança, dinheiro, dado pessoal). Ataca quem não escreveu o código.
