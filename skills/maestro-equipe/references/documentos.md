@@ -5,14 +5,16 @@
 O `maestri list` não mostra o modelo, e no Claude Code o modelo só aparece no banner do topo, que some depois que o terminal trabalha. Por isso a formação fica anotada:
 
 ```
-| Terminal | Ferramenta | Modelo · effort | Família | Perfis | Comando/preset |
-|---|---|---|---|---|---|
-| Brasa | Claude Code | Haiku 5.5 · medium | Claude | Batedor | preset "Haiku" |
-| Neblina | Antigravity | Gemini 4 Hydrogen · high | Gemini | Volume | preset "Agy Hydrogen" |
-| Musgo | OpenCode | deepseek-v4.1-flash-free | aberto | Batedor (não sensível) | preset "OpenCode Gratis" |
+| Terminal | Ferramenta | Modelo · effort | Peso do par | Família | Perfis | Comando/preset |
+|---|---|---|---|---|---|---|
+| Brasa | Claude Code | Haiku 5.5 · medium | 2 | Claude | Batedor | preset "Haiku" |
+| Faísca | Antigravity | Gemini 4 Hydrogen · low | 15 | Gemini | Batedor | preset "Agy Hydrogen Low" |
+| Neblina | Antigravity | Gemini 4 Hydrogen · medium | 30 | Gemini | Volume / Fatias / UI | preset "Agy Hydrogen" |
+| Prisma | Antigravity | Gemini 4 Neon · medium | 60 | Gemini | Spec / Julgamento / MCP | preset "Agy Neon" |
+| Musgo | OpenCode | deepseek-v4.1-flash-free | 0 | aberto | Batedor (não sensível) | preset "OpenCode Gratis" |
 ```
 
-Atualize a linha a cada `recruit --replace` ou troca de modelo.
+`Peso do par` = `peso do modelo × multiplicador de effort` (valores `[incerto]` em `modelos.md`; **pesado** = Neon, Opus, Astra, Fable; **leve** = Hydrogen, Argon, Sol, Sonnet, Terra, Luna, Haiku, Flash, OpenCode). Atualize a linha a cada `recruit --replace` ou troca de modelo; `Hydrogen high` (leve, barato) e terminais pesados em `high` entram sob demanda e voltam ao par base ao terminar.
 
 ## Quadro da rodada (nota do Maestri, fichário "Rodadas"; só o Maestro escreve)
 
@@ -22,7 +24,7 @@ Legenda: N0-N4 | status: a fazer > fazendo > revisão > aprovado | revisor sempr
 Cota no início: <saída curta do cotas.py>
 
 [RNN-T1] N? · <título>
-  Autor: <terminal> (<modelo, effort>) · Revisor: <terminal> (<família>) · Testes: <terminal ou —>
+  Autor: <terminal> (<modelo, effort>) · Tamanho: <P|M> (G = quebrar) · Custo: <n> · Revisor: <terminal> (<família>) · Testes: <terminal ou —>
   Pastas: <pastas> · Migração reservada: <V? ou —> · Risco: <segurança/dinheiro/dado pessoal ou —>
   Status: a fazer · Relatório: .maestri/relatorios/RNN-T1.md
   Pronto quando: <critério verificável>
@@ -40,7 +42,7 @@ Cota no início: <saída curta do cotas.py>
 ## Tarefas
 
 ### RNN-T1 · N<0-4> · <título>
-- **Autor:** <terminal> · **Modelo e effort:** <ex.: Hydrogen high> · **Revisor:** <outra família> · **Testes:** <terminal ou —>
+- **Autor:** <terminal> · **Tamanho:** <P|M> (G = quebrar) · **Roteamento:** `<modelo> <effort> | custo <n> | descartado: <par mais barato> porque <motivo>` · **Revisor:** <outra família> · **Testes:** <terminal ou —>
 - **Pastas permitidas:** <pastas> · **Floor:** <nome ou —> · **Risco:** <—>
 - **Fazer:** <descrição>
 - **Pronto quando:** <critério verificável; UI inclui portal em 390x844 e 1280>
