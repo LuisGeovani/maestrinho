@@ -186,6 +186,80 @@ class TestEquilibrio(unittest.TestCase):
         self.assertEqual(retidas, [RETENCAO])
         self.assertIn("Malho", aceitas)
 
+    def test_veto_do_destino_precede_as_demais_travas(self):
+        self.cotas_do_caso()
+        dados = json.loads(self.status.read_text(encoding="utf-8"))
+        codex = dados["providers"][1]
+        semanal, cinco_horas = codex["meters"][0]["windows"]
+        texto = (
+            "### Prumo | VETO\nTamanho: G\n"
+            "Motivo pool: ambiente obrigatório.\n"
+            "Roteamento: Sol medium | descartado: Luna high porque exige contexto.\n"
+        )
+        for uso, permitido, motivo in (
+            (96, True, "janela com uso ≥95%"),
+            (95, True, "janela com uso ≥95%"),
+            (0, False, "usageAllowed=false"),
+        ):
+            with self.subTest(uso=uso, permitido=permitido):
+                semanal["usedPercent"] = uso
+                cinco_horas["usedPercent"] = 0
+                codex["usageAllowed"] = permitido
+                self.status.write_text(json.dumps({"providers": [codex]}), encoding="utf-8")
+                pools, _ = cotas.ler_cotas()
+                aceitas, retidas, _ = self.avaliar(texto, pools)
+                janela = semanal if permitido else cinco_horas
+                reset = datetime.fromisoformat(janela["resetsAt"]).astimezone().isoformat(timespec="minutes")
+                self.assertEqual(aceitas, {})
+                self.assertEqual(retidas, [f"RETIDO (veto): Prumo | VETO: Codex ({motivo}) | reset {reset}"])
+
+    def test_veto_do_claude_code_quando_o_provedor_omite_o_plano(self):
+        self.cotas_do_caso()
+        dados = json.loads(self.status.read_text(encoding="utf-8"))
+        claude = dados["providers"][0]
+        del claude["plan"]
+        claude["usageAllowed"] = False
+        self.status.write_text(json.dumps(dados), encoding="utf-8")
+        pools, _ = cotas.ler_cotas()
+        texto = "### Tocha | VETO\nTamanho: M\nMotivo pool: ambiente obrigatório.\n"
+
+        aceitas, retidas, _ = self.avaliar(texto, pools)
+
+        reset = datetime.fromisoformat(claude["meters"][0]["windows"][1]["resetsAt"])
+        self.assertEqual(aceitas, {})
+        self.assertEqual(retidas, [
+            "RETIDO (veto): Tocha | VETO: Claude Code (plano não identificado) (usageAllowed=false) | "
+            f"reset {reset.astimezone().isoformat(timespec='minutes')}"
+        ])
+
+    def test_tamanho_g_exige_indivisibilidade_e_preserva_a_trava_de_custo(self):
+        pools = self.cotas_do_caso()
+        secao = "### Prumo | GRANDE\nTamanho: G\n"
+        rota = "Roteamento: Sol medium | descartado: Luna high porque a análise exige contexto.\n"
+        for motivo in ("", "Indivisível: \t\n"):
+            with self.subTest(motivo=motivo):
+                aceitas, retidas, _ = self.avaliar(secao + motivo + rota, pools)
+                self.assertEqual(aceitas, {})
+                self.assertEqual(len(retidas), 1)
+                self.assertIn("RETIDO (tamanho): Prumo | GRANDE", retidas[0])
+        consulta = secao + "Indivisível: uma decisão depende de todo o histórico.\n"
+        aceitas, retidas, _ = self.avaliar(consulta, pools)
+        self.assertEqual(aceitas, {})
+        self.assertEqual(len(retidas), 1)
+        self.assertIn("RETIDO (custo): Prumo | GRANDE", retidas[0])
+        aceitas, retidas, _ = self.avaliar(consulta + rota, pools)
+        self.assertEqual(retidas, [])
+        self.assertEqual(aceitas["Prumo"][4:6], (360, "G"))
+
+    def test_rota_minimo_apto_basta_abaixo_do_limiar(self):
+        texto = (
+            "### Prumo | BARATO\nTamanho: M\n"
+            "Roteamento: Hydrogen medium | custo 90 | mínimo apto\n"
+        )
+        aceitas, retidas, _ = self.avaliar(texto, self.cotas_do_caso())
+        self.assertEqual(retidas, [])
+        self.assertEqual(aceitas["Prumo"][4:6], (120, "M"))
+
     def test_status_ausente_ou_com_estrutura_errada_so_avisa(self):
         with patch.object(cotas, "_cotas_rollout", return_value=[]):
             casos = (
@@ -235,6 +309,8 @@ class TestEquilibrio(unittest.TestCase):
 
     def test_preset_resolve_as_duas_familias_do_medidor_compartilhado(self):
         pools = self.cotas_do_caso()
+        agy = next(p for p in pools if p["via_claude"] == "Antigravity")
+        agy.update(uso_max=18, veto_despacho=None)
         self.preset.side_effect = [("Command: agy --model claude-sonnet", ""),
                                    ("Command: agy --model gpt-5", "")]
         texto = "### Agy Claude | TC\nMotivo pool: teste.\n### Agy GPT | TG\nMotivo pool: teste."
@@ -313,6 +389,35 @@ class TestEquilibrio(unittest.TestCase):
         ids = [linha.split("\t")[1] for linha in self.log.read_text(encoding="utf-8").splitlines()]
         self.assertCountEqual(ids, ["T2", "T3", "T4", "T5", "T6", "T7"])
 
+    def test_resumo_do_batch_preserva_veredito_do_relatorio_eco_real(self):
+        original = Path(__file__).resolve().parents[3] / ".maestri" / "relatorios" / "ECO-T1-R.md"
+        if not original.exists():
+            self.skipTest("relatório local ECO-T1-R.md ausente")
+        self.cotas_do_caso()
+        self.despacho.write_text("### Prumo | ECO-T1-R\nTamanho: M\nConfira.\n", encoding="utf-8")
+
+        def gravar_relatorio(exe, pendentes, inicio, minutos):
+            caminho, _ = pendentes["Prumo"]
+            caminho.write_bytes(original.read_bytes())
+            return set()
+
+        with patch.object(batch, "esperar_terminar", side_effect=gravar_relatorio):
+            codigo, saida, _, _ = self.rodar_lote()
+        self.assertEqual(codigo, 0)
+        self.assertIn("== Prumo (ECO-T1-R): pronto | veredito aprovado com ajustes (decisão pendente)", saida)
+
+    def test_veredito_so_le_campo_inteiro_e_sinaliza_valor_desconhecido(self):
+        self.assertEqual(batch.resumo_veredito("Texto com VEREDITO: aprovado"), "")
+        self.assertEqual(
+            batch.resumo_veredito("STATUS: pronto\r\nVEREDITO: aprovado com ajustes\r\n"),
+            " | veredito aprovado com ajustes (decisão pendente)",
+        )
+        self.assertEqual(batch.resumo_veredito("**VEREDITO:** reprovado"), " | veredito reprovado")
+        self.assertEqual(
+            batch.resumo_veredito("VEREDITO: aprovado provisoriamente"),
+            " | veredito desconhecido: aprovado provisoriamente",
+        )
+
     def test_enter_com_erro_e_relatorio_novo_preserva_sucesso(self):
         self.cotas_do_caso(idade_claude=2)
 
@@ -389,7 +494,7 @@ class TestEquilibrio(unittest.TestCase):
                 self.assertEqual(out.count(f"PERMISSAO pendente: {agente}"), 1)
                 self.assertIn("Allow", out)
 
-    def test_trava_gemini_preferencial_e_limites(self):
+    def test_equilibrio_aplica_mesmo_limiar_a_gemini_e_argon(self):
         def pools_custom(gem_sem, gem_5h, codex_sem, claude_sem):
             def med(nome, sem, cinco=None):
                 js = [{"durationSeconds": 604800, "usedPercent": sem,
@@ -413,20 +518,21 @@ class TestEquilibrio(unittest.TestCase):
             ]}), encoding="utf-8")
             return cotas.ler_cotas()[0]
 
-        # 1) Gemini 60% vs Codex 40% -> NAO retido (mesmo com +20 pp)
-        pools = pools_custom(gem_sem=60, gem_5h=20, codex_sem=40, claude_sem=40)
+        pools = pools_custom(gem_sem=40, gem_5h=20, codex_sem=20, claude_sem=30)
         aceitas, retidas, _ = self.avaliar("### Malho | G1\nOk.\n### Ferro | G2\nOk.\n", pools)
-        self.assertEqual(retidas, [])
-        self.assertEqual(set(aceitas), {"Malho", "Ferro"})
+        self.assertEqual(aceitas, {})
+        self.assertEqual(len(retidas), 2)
+        self.assertIn("RETIDO (equilíbrio): Malho | G1: Gemini Models 40% vs Codex 20%", retidas[0])
+        self.assertIn("RETIDO (equilíbrio): Ferro | G2: Gemini 4 Argon 40% vs Codex 20%", retidas[1])
 
-        # 2) Gemini 85% semanal -> RETIDO (e liberado com Motivo pool:)
+        # A justificativa libera o Argon mesmo acima do limiar relativo.
         pools = pools_custom(gem_sem=85, gem_5h=20, codex_sem=40, claude_sem=40)
         aceitas, retidas, _ = self.avaliar("### Malho | G3\nOk.\n### Ferro | G4\nMotivo pool: necessário.\n", pools)
         self.assertEqual(len(retidas), 1)
         self.assertIn("RETIDO (equilíbrio): Malho | G3", retidas[0])
         self.assertIn("Ferro", aceitas)
 
-        # 3) Gemini 5h 90% (mesmo com semanal 50%) -> RETIDO
+        # A janela de 5 h determina o uso quando é a mais apertada.
         pools = pools_custom(gem_sem=50, gem_5h=90, codex_sem=40, claude_sem=40)
         aceitas, retidas, _ = self.avaliar("### Malho | G5\nOk.\n", pools)
         self.assertEqual(len(retidas), 1)
@@ -438,8 +544,12 @@ class TestEquilibrio(unittest.TestCase):
         self.assertEqual(len(retidas), 1)
         self.assertIn("RETIDO (equilíbrio): Tocha | C1: Claude Pro 70% vs Gemini Models 40%", retidas[0])
 
-    def test_cotas_gemini_rotina_ate_80_semanal_e_preferencial(self):
-        # Gemini 60% semanal no começo da semana (ritmo adiantado) continua rotina e lidera "Gaste primeiro"
+        pools = pools_custom(gem_sem=85, gem_5h=90, codex_sem=80, claude_sem=80)
+        aceitas, retidas, _ = self.avaliar("### Malho | G6\nOk.\n### Ferro | G7\nOk.\n", pools)
+        self.assertEqual(retidas, [])
+        self.assertEqual(set(aceitas), {"Malho", "Ferro"})
+
+    def test_cotas_ordenam_por_folga_sem_preferir_gemini(self):
         self.status.write_text(json.dumps({"providers": [
             {"id": "codex", "name": "Codex", "plan": "Plus", "state": "ready",
              "lastSuccessAt": self.agora.isoformat(),
@@ -452,7 +562,7 @@ class TestEquilibrio(unittest.TestCase):
              "meters": [
                  {"label": "Gemini Models", "windows": [
                      {"durationSeconds": 604800, "usedPercent": 60,
-                      "resetsAt": (self.agora + timedelta(days=6)).isoformat()},
+                      "resetsAt": (self.agora + timedelta(days=3)).isoformat()},
                      {"durationSeconds": 18000, "usedPercent": 50,
                       "resetsAt": (self.agora + timedelta(hours=4)).isoformat()},
                  ]},
@@ -469,7 +579,20 @@ class TestEquilibrio(unittest.TestCase):
         self.assertEqual(argon["despacho"], "só insubstituível")
         resumo = "\n".join(cotas.resumo_linhas(pools, []))
         gaste = next(l for l in resumo.splitlines() if l.startswith("Gaste primeiro:"))
-        self.assertLess(gaste.index("Antigravity/Gemini Models"), gaste.index("Codex/Codex"))
+        self.assertLess(gaste.index("Codex/Codex"), gaste.index("Antigravity/Gemini Models"))
+
+    def test_ordem_claude_prioriza_antigravity_ate_o_veto(self):
+        self.cotas_do_caso()
+        dados = json.loads(self.status.read_text(encoding="utf-8"))
+        medidor_agy = dados["providers"][2]["meters"][2]
+        medidor_agy["windows"][0]["usedPercent"] = 70
+        self.status.write_text(json.dumps(dados), encoding="utf-8")
+        pools, _ = cotas.ler_cotas()
+        self.assertEqual(cotas.ordem_claude(pools)["destino"], "Antigravity")
+        medidor_agy["windows"][0]["usedPercent"] = 96
+        self.status.write_text(json.dumps(dados), encoding="utf-8")
+        pools, _ = cotas.ler_cotas()
+        self.assertEqual(cotas.ordem_claude(pools)["destino"], "Claude Code")
 
     def test_trava_custo_limiar_e_justificativa(self):
         self.equipe.write_text(
@@ -533,9 +656,9 @@ class TestEquilibrio(unittest.TestCase):
         # 5) Sem linha Tamanho -> assume M com aviso; OpenCode grátis -> custo 0; modelo desconhecido -> só aviso
         aceitas, retidas, avisos = self.avaliar(
             "### Hydrogen | H2\nOk.\n"
-            "### OpenCode | O1\nTamanho: G\nOk.\n"
+            "### OpenCode | O1\nTamanho: G\nIndivisível: auditoria conjunta.\n"
             "### Orch | OR1\nTamanho: M\nOk.\n"
-            "### Desconhecido | D1\nTamanho: G\nOk.\n",
+            "### Desconhecido | D1\nTamanho: G\nIndivisível: auditoria conjunta.\n",
             pools,
         )
         self.assertEqual(retidas, [])
@@ -744,6 +867,7 @@ class TestEquilibrio(unittest.TestCase):
             "skills/maestro-equipe/scripts/cotas.py, "
             ".maestri/equipe.md e tests/test_equilibrio.py.\n"
             "### Ferro | T5\nTamanho: G\n"
+            "Indivisível: auditoria conjunta.\n"
             "Roteamento: Argon high | descartado: Hydrogen high porque precisa de cuidado.\n"
             "Faça o teste.\n",
             encoding="utf-8",

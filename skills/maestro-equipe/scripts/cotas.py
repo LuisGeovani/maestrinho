@@ -22,6 +22,7 @@ RITMO = {604800, 2592000}
 MEDIDORES_AGY_CLAUDE = {"claude and gpt", "claude and gpt models"}
 FAMILIAS = ("Claude", "GPT", "Gemini", "aberto", "desconhecido")
 LOG_DISTRIBUICAO = "distribuicao.log"
+LIMIAR_VETO = 95
 
 
 def arquivo_status() -> Path:
@@ -243,18 +244,6 @@ def _janela(janela, agora):
     return {"janela": rotulo, "usado": usado, "reset": reset, "falta": _falta(reset, agora), "ritmo": ritmo}
 
 
-def _gemini_apertado(janelas, uso_max):
-    """Pool Gemini só vira 'só insubstituível' a partir de 80% semanal ou 90% em 5h."""
-    semanais = [
-        j["usado"] for j in janelas
-        if j["usado"] is not None and j["janela"].casefold() in ("semanal", "weekly", "mensal", "monthly")
-    ]
-    cinco_h = [j["usado"] for j in janelas if j["usado"] is not None and j["janela"].casefold() == "5h"]
-    if semanais or cinco_h:
-        return any(u >= 80 for u in semanais) or any(u >= 90 for u in cinco_h)
-    return uso_max is not None and uso_max >= 80
-
-
 def _medidores(provedor, agora, origem, avisos):
     nome = provedor.get("name") or provedor.get("id") or "?"
     plano = provedor.get("plan") or ""
@@ -318,18 +307,15 @@ def _medidores(provedor, agora, origem, avisos):
         if not claude_code and any(j["ritmo"] and j["ritmo"]["estado"] == "desconhecido" for j in janelas):
             motivos.append("faltam dados para o ritmo semanal ou mensal")
         adiantado = any(j["ritmo"] and j["ritmo"]["estado"] == "adiantado" for j in janelas)
-        gemini_pool = antigravity and via_claude is None
         veto_provedor = provedor.get("usageAllowed") is False or medidor.get("usageAllowed") is False
-        veto_janela = uso_max is not None and uso_max >= 95
-        veto = "usageAllowed=false" if veto_provedor else "janela com uso ≥95%" if veto_janela else None
+        veto_janela = uso_max is not None and uso_max >= LIMIAR_VETO
+        veto = "usageAllowed=false" if veto_provedor else f"janela com uso ≥{LIMIAR_VETO}%" if veto_janela else None
         if veto:
             despacho = "fila" if veto_janela and uso_max >= 100 else "nenhum"
         elif motivos:
             despacho = "reconferir" if claude_code else "sondagem"
         elif claude_code:
             despacho = "reserva Claude"
-        elif gemini_pool:
-            despacho = "só insubstituível" if _gemini_apertado(janelas, uso_max) else "rotina"
         elif uso_max >= 80 or adiantado:
             despacho = "só insubstituível"
         else:
@@ -434,8 +420,8 @@ def _cotas_rollout(plano_esperado=None):
     return []
 
 
-def _reset_veto(pool):
-    bloqueadas = [j["reset"] for j in pool["janelas"] if j["usado"] is not None and j["usado"] >= 95]
+def reset_veto(pool):
+    bloqueadas = [j["reset"] for j in pool["janelas"] if j["usado"] is not None and j["usado"] >= LIMIAR_VETO]
     if bloqueadas:
         return max(bloqueadas) if all(bloqueadas) else None
     return pool["reset_min"]
@@ -452,10 +438,10 @@ def ordem_claude(pools):
         return {"destino": "Antigravity", "reset": None}
     if not agy["veto_despacho"]:
         return {"destino": "reconferir Antigravity", "reset": None}
-    reset_agy = _reset_veto(agy)
+    reset_agy = reset_veto(agy)
     if claude_code and claude_code["elegivel"]:
         return {"destino": "Claude Code", "reset": reset_agy}
-    reset_claude_code = _reset_veto(claude_code) if claude_code and claude_code["veto_despacho"] else None
+    reset_claude_code = reset_veto(claude_code) if claude_code and claude_code["veto_despacho"] else None
     return {"destino": "bloqueado", "reset": min((r for r in (reset_agy, reset_claude_code) if r), default=None)}
 
 
@@ -480,7 +466,7 @@ def resumo_linhas(pools, avisos):
                           f"limite {ritmo['limite']:.0f}%, {ritmo['estado']}]")
             elif ritmo:
                 parte += " [ritmo: desconhecido]"
-            janela_cheia = j["usado"] is not None and j["usado"] >= 95
+            janela_cheia = j["usado"] is not None and j["usado"] >= LIMIAR_VETO
             if j["reset"] and (janela_cheia or p["veto_despacho"] == "usageAllowed=false"):
                 rotulo = "reset da fila" if janela_cheia and j["usado"] >= 100 else "reset conhecido"
                 parte += f" [{rotulo}: {j['reset'].astimezone().isoformat(timespec='minutes')}]"
@@ -507,18 +493,15 @@ def resumo_linhas(pools, avisos):
         linhas.append(f"{cabecalho}: {janelas} | estado {p['estado']} | "
                       f"elegível: {elegivel}, {p['despacho']}{detalhe}{reserva}")
     linhas.append(linha_claude)
-    def _eh_gemini(p):
-        return p["provedor"].casefold() == "antigravity" and p["via_claude"] is None
-
     ordem = sorted(
         (p for p in pools if p["uso_max"] is not None and (p["estado"] == "ready" or p["veto_despacho"])),
-        key=lambda p: (0 if _eh_gemini(p) else 1, p["uso_max"], p["reset_min"] or datetime.max.replace(tzinfo=timezone.utc)),
+        key=lambda p: (p["uso_max"], p["reset_min"] or datetime.max.replace(tzinfo=timezone.utc)),
     )
     folga = [f"{p['provedor']}/{p['medidor']} ({100 - round(p['uso_max'])}% livre)" for p in ordem if p["despacho"] == "rotina"]
     poupe = [
         f"{p['provedor']}/{p['medidor']} ({round(p['uso_max'])}%)"
         for p in ordem
-        if (_gemini_apertado(p["janelas"], p["uso_max"]) if _eh_gemini(p) else p["uso_max"] >= 80)
+        if p["uso_max"] >= 80
     ]
     if folga:
         linhas.append("Gaste primeiro: " + " > ".join(folga))

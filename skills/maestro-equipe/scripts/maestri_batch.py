@@ -39,7 +39,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from cotas import LOG_DISTRIBUICAO, formatar_distribuicao, ler_cotas
+from cotas import LIMIAR_VETO, LOG_DISTRIBUICAO, formatar_distribuicao, ler_cotas, reset_veto
 from inventario import (
     CLI_PRESET, MEDIDORES_GEMINI_CONHECIDOS, MODELO_PRESET,
     comando_da_formacao, comando_preset, ferramenta_e_pool, rodar,
@@ -47,8 +47,6 @@ from inventario import (
 
 LIMITE_JSON = 24000
 LIMIAR_EQUILIBRIO = 15
-LIMIAR_GEMINI_SEMANAL = 80
-LIMIAR_GEMINI_5H = 90
 LIMIAR_CUSTO = 300
 PESOS_MODELO = {
     "luna": 1,
@@ -85,6 +83,7 @@ RE_CONTA_FORMACAO = re.compile(r'\bconta\s*[:=]?\s*(?:"([^"]+)"|([^\s),;|]+))', 
 RE_CONTA_LIST = re.compile(r'\baccount\s*:\s*(?:"([^"]+)"|([^,|\s]+))', re.I)
 RE_MOTIVO_POOL = re.compile(r"^Motivo pool:\s*(\S.*)", re.I)
 RE_TAMANHO = re.compile(r"^Tamanho:\s*([PMG])(?:\s|$)", re.I)
+RE_INDIVISIVEL = re.compile(r"^Indivisível:\s*\S", re.I)
 RE_ROTEAMENTO = re.compile(r"^Roteamento:\s*(\S.*)", re.I)
 RE_JUSTIFICATIVA_CUSTO = re.compile(
     r"\bdescartado:\s*(?!porque\b)[^\s|][^|]*?\bporque(?:\s*:\s*|\s+)[^\s|]",
@@ -192,7 +191,7 @@ RELATORIO (obrigatorio ao terminar, ou se bloquear):
 1. Grave o relatorio completo no arquivo {arquivo} (UTF-8; a pasta ja existe), um campo por linha:
    TAREFA: {id}
    STATUS: pronto, parcial ou bloqueado
-   VEREDITO: aprovado ou reprovado (so em revisao)
+   VEREDITO: aprovado, aprovado com ajustes ou reprovado (so em revisao)
    ARQUIVOS: o que criou ou alterou
    VALIDACAO: comandos rodados e resultado
    PENDENCIAS: o que falta ou depende de decisao
@@ -203,9 +202,22 @@ RELATORIO (obrigatorio ao terminar, ou se bloquear):
    O aviso e curto de proposito: nada de aspas extras, barras invertidas ou texto longo nele.
 """
 RE_STATUS = re.compile(r"STATUS\s*[:=]\s*\**\s*(pronto|parcial|bloqueado|aprovado|reprovado)", re.I)
-RE_VEREDITO = re.compile(r"VEREDITO\s*[:=]\s*\**\s*(aprovado|reprovado)", re.I)
+RE_VEREDITO = re.compile(r"^(?:\*\*)?VEREDITO(?:\*\*)?[ \t]*[:=][ \t]*([^\r\n]*)", re.I | re.M)
 FIM_RODAPE = "O aviso e curto de proposito"
 RE_MOLDURA = re.compile(r"^[\s─━═╌┄\-_>❯›?⏵]*$|auto mode|shift\+tab|for shortcuts|bypass permissions|accept edits")
+
+
+def resumo_veredito(conteudo):
+    campo = RE_VEREDITO.search(conteudo)
+    if campo is None:
+        return ""
+    valor = campo.group(1).strip(" \t*")
+    chave = " ".join(valor.casefold().split())
+    if chave == "aprovado com ajustes":
+        return " | veredito aprovado com ajustes (decisão pendente)"
+    if chave in ("aprovado", "reprovado"):
+        return f" | veredito {chave}"
+    return f" | veredito desconhecido: {valor or '(vazio)'}"
 
 
 def texto_nao_enviado(saida):
@@ -448,8 +460,8 @@ def _conta_padrao(conta):
 
 
 def nome_pool(cota):
-    if cota["via_claude"] == "Claude Code" and cota["plano"]:
-        return f"Claude {cota['plano'].title()}"
+    if cota["via_claude"] == "Claude Code":
+        return ferramenta_e_pool("claude", cota["plano"].title())[1]
     if cota["via_claude"] == "Antigravity":
         return "Claude and GPT models"
     if cota.get("eh_codex") or (
@@ -470,7 +482,7 @@ def _classificar_comando(comando, plano_claude, medidores):
     if cli == "Codex":
         return "GPT", pool
     if cli == "Claude Code":
-        return "Claude", pool if plano_claude else "desconhecido"
+        return "Claude", pool
     if pool == "Claude and GPT models":
         modelo = MODELO_PRESET.search(comando)
         modelo = modelo.group(1).casefold() if modelo else ""
@@ -558,22 +570,6 @@ def _caminhos_distintos(linhas):
                 continue
             caminhos.add(m.group(0).strip("`\"'.,;:()[]").casefold())
     return caminhos
-
-
-def _gemini_apertado(cota):
-    """Gemini só trava em ≥80% na janela semanal (ou ≥90% na de 5 h)."""
-    janelas = cota.get("janelas") or []
-    semanais = [
-        j["usado"] for j in janelas
-        if j.get("usado") is not None and j.get("janela", "").casefold() in ("semanal", "weekly", "mensal", "monthly")
-    ]
-    cinco_h = [
-        j["usado"] for j in janelas
-        if j.get("usado") is not None and j.get("janela", "").casefold() == "5h"
-    ]
-    if semanais or cinco_h:
-        return any(u >= LIMIAR_GEMINI_SEMANAL for u in semanais) or any(u >= LIMIAR_GEMINI_5H for u in cinco_h)
-    return cota.get("uso_max") is not None and cota["uso_max"] >= LIMIAR_GEMINI_SEMANAL
 
 
 def _conta_da_formacao(linha, ferr_bruta):
@@ -671,6 +667,12 @@ def pool_do_destino(exe, linha, plano_claude, medidores, comandos, agente=""):
     return familia, pool
 
 
+def _pool_pago(nome, cota):
+    return (nome.casefold() not in ("grátis", "opencode")
+            and cota["provedor"].casefold() != "opencode"
+            and cota["plano"].casefold() not in ("free", "grátis", "gratis"))
+
+
 def avaliar_equilibrio(exe, formacao, secoes, pools, resumo_custos=None, contas=None):
     plano_claude = next((p["plano"].title() for p in pools
                          if p["via_claude"] == "Claude Code" and p["plano"]), "")
@@ -680,10 +682,8 @@ def avaliar_equilibrio(exe, formacao, secoes, pools, resumo_custos=None, contas=
             medidores[medidor] = None
     por_pool = {nome_pool(p): p for p in pools}
     contas = contas or {}
-    menor = min((p for p in pools if p["estado"] == "ready" and p["uso_max"] is not None
-                 and not p["veto_despacho"] and nome_pool(p).casefold() not in ("grátis", "opencode")
-                 and p["provedor"].casefold() != "opencode"
-                 and p["plano"].casefold() not in ("free", "grátis", "gratis")),
+    menor = min((p for nome, p in por_pool.items() if p["estado"] == "ready" and p["uso_max"] is not None
+                 and p["uso_max"] < LIMIAR_VETO and not p["veto_despacho"] and _pool_pago(nome, p)),
                 key=lambda p: p["uso_max"], default=None)
     comandos, telas, aceitas, retencoes = {}, {}, {}, []
     for secao in secoes:
@@ -721,26 +721,32 @@ def avaliar_equilibrio(exe, formacao, secoes, pools, resumo_custos=None, contas=
             resumo_custos[agente] = (ident, custo, tamanho)
 
         cota = por_pool.get(pool)
-        uso_pool = cota["uso_max"] if (cota and cota["estado"] == "ready" and cota["uso_max"] is not None) else None
+        uso = cota["uso_max"] if cota else None
+        uso_pool = uso if cota and cota["estado"] == "ready" else None
+        veto = cota["veto_despacho"] if cota else None
+        if veto or (uso is not None and uso >= LIMIAR_VETO):
+            motivo_veto = veto or f"janela com uso ≥{LIMIAR_VETO}%"
+            reset = reset_veto(cota)
+            quando = reset.astimezone().isoformat(timespec="minutes") if reset else "desconhecido"
+            retencoes.append(f"RETIDO (veto): {agente} | {ident}: {pool} ({motivo_veto}) | reset {quando}")
+            continue
+        if tamanho == "G" and not any(RE_INDIVISIVEL.match(linha) for linha in secao["linhas"]):
+            retencoes.append(
+                f"RETIDO (tamanho): {agente} | {ident}: Tamanho G. Divida a tarefa ou, para consulta "
+                "ou auditoria indivisível, declare 'Indivisível: <motivo>'."
+            )
+            continue
         retida = False
         if pool == "desconhecido":
             print(f"aviso: {agente} | {ident}: pool desconhecido")
-        elif pool != "grátis":
-            if not cota or cota["estado"] != "ready" or cota["uso_max"] is None:
+        elif pool != "grátis" and (not cota or _pool_pago(pool, cota)):
+            if uso_pool is None:
                 print(f"aviso: {agente} | {ident}: {pool} sem leitura fresca ou verificável")
             elif menor is None:
                 print(f"aviso: {agente} | {ident}: sem pool pago elegível para comparação")
-            elif familia == "Gemini":
-                if _gemini_apertado(cota) and motivo is None:
-                    retencoes.append(
-                        f"RETIDO (equilíbrio): {agente} | {ident}: {pool} {round(cota['uso_max'])}% "
-                        f"(Gemini apertado: semanal ≥{LIMIAR_GEMINI_SEMANAL}% ou 5h ≥{LIMIAR_GEMINI_5H}%; "
-                        f"menor {nome_pool(menor)} {round(menor['uso_max'])}%); reencaminhe ou justifique com 'Motivo pool:'"
-                    )
-                    retida = True
-            elif cota["uso_max"] - menor["uso_max"] >= LIMIAR_EQUILIBRIO and motivo is None:
+            elif uso_pool - menor["uso_max"] >= LIMIAR_EQUILIBRIO and motivo is None:
                 retencoes.append(
-                    f"RETIDO (equilíbrio): {agente} | {ident}: {pool} {round(cota['uso_max'])}% vs "
+                    f"RETIDO (equilíbrio): {agente} | {ident}: {pool} {round(uso_pool)}% vs "
                     f"{nome_pool(menor)} {round(menor['uso_max'])}%; reencaminhe ou justifique com 'Motivo pool:'"
                 )
                 retida = True
@@ -1132,10 +1138,10 @@ def main() -> int:
             falhou = True
             continue
         if relatorio_novo(relatorios.get(agente), inicio):
-            conteudo = arq.read_text(encoding="utf-8", errors="replace")[:3000]
-            achado, veredito = RE_STATUS.search(conteudo), RE_VEREDITO.search(conteudo)
+            conteudo = arq.read_text(encoding="utf-8-sig", errors="replace")
+            achado = RE_STATUS.search(conteudo[:3000])
             status = achado.group(1).lower() if achado else "sem STATUS no arquivo"
-            extra = f" | veredito {veredito.group(1).lower()}" if veredito else ""
+            extra = resumo_veredito(conteudo)
             print(f"== {agente} ({ident}): {status}{extra} | relatório: {arq}")
             falhou = falhou or achado is None or status == "bloqueado"
             continue
