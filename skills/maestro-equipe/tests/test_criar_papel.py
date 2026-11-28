@@ -62,6 +62,9 @@ class TestCriarPapel(unittest.TestCase):
             self.assertIn("Continuam proibidos git de escrita, instalar pacote, rede para hosts não citados no despacho e escrita fora da raiz.", texto)
 
             self.assertNotIn("até 5 apontamentos", texto)
+            self.assertIn("Se o plugin superpowers estiver disponível, use as skills de método", texto)
+            self.assertIn("não use subagent-driven-development, dispatching-parallel-agents nem finishing-a-development-branch", texto)
+            self.assertIn("nunca faça commit, merge, worktree ou PR por conta de uma skill: o despacho e o Maestro mandam.", texto)
 
 
 if __name__ == "__main__":
