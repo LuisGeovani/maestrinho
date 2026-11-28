@@ -5,7 +5,7 @@ Uso:
 
 Fonte principal: <MAESTRI_DATA_DIR>/usage/providers/.status.json. Quando a leitura
 do Codex é desconhecida, busca limites válidos nos cinco rollouts mais recentes.
-"Gaste primeiro" prioriza pools Gemini de rotina (cota enche mais devagar; só apertam em ≥80% semanal ou ≥90% em 5h) e depois os demais pools de rotina pela folga na janela mais usada e, no empate, pelo reset mais próximo.
+"Gaste primeiro" ordena todos os pools pagos pela folga na janela mais usada e, no empate, pelo reset mais próximo, sem preferência de família.
 "Ordem Claude agora" vale depois de escolher a família Claude.
 """
 import json
