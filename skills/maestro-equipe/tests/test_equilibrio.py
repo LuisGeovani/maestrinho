@@ -268,8 +268,10 @@ class TestEquilibrio(unittest.TestCase):
         self.assertIn("Distribuição do lote: " + esperado, saida)
         linhas = [linha.split("\t") for linha in self.log.read_text(encoding="utf-8").splitlines()]
         self.assertEqual(len(linhas), 6)
-        self.assertTrue(all(len(linha) == 6 and cotas._data(linha[0]) for linha in linhas))
-        self.assertIn(["T2", "Vela", "Claude", "Claude Pro", "Precisa deste pool."], [l[1:] for l in linhas])
+        self.assertTrue(all(len(linha) == 9 and cotas._data(linha[0]) for linha in linhas))
+        self.assertIn(["T2", "Vela", "Claude", "Claude Pro", "Precisa deste pool.", "120", "M", ""],
+                      [l[1:] for l in linhas])
+        self.assertIn(["T3", "Prumo", "GPT", "Codex", "", "120", "M", "10"], [l[1:] for l in linhas])
         self.assertNotIn("Ferro", [linha[2] for linha in linhas])
         agora = datetime.now(timezone.utc)
         with self.log.open("a", encoding="utf-8") as log:
@@ -343,7 +345,7 @@ class TestEquilibrio(unittest.TestCase):
         pools = self.cotas_do_caso()
         texto = (
             "### Hydrogen | H1\nOk.\n"
-            "### Neon | N1\nOk.\n"
+            "### Neon | N1\nTamanho: P\nOk.\n"
             "### Argon | A1\nOk.\n"
             "### Sol | S1\nValide com: pytest\n"
             "### OpenCode | O1\nOk.\n"
@@ -468,6 +470,348 @@ class TestEquilibrio(unittest.TestCase):
         resumo = "\n".join(cotas.resumo_linhas(pools, []))
         gaste = next(l for l in resumo.splitlines() if l.startswith("Gaste primeiro:"))
         self.assertLess(gaste.index("Antigravity/Gemini Models"), gaste.index("Codex/Codex"))
+
+    def test_trava_custo_limiar_e_justificativa(self):
+        self.equipe.write_text(
+            "| Terminal | Ferramenta | Modelo · effort | Perfis | Pool |\n"
+            "|---|---|---|---|---|\n"
+            "| Astra | Codex | GPT-6.2 Astra · high | N3 | Codex |\n"
+            "| Hydrogen | Antigravity | Gemini 4 Hydrogen · high | Volume | Gemini Models |\n"
+            "| Orch | Antigravity | gemini-pro-orchestrator-neon · medium | Multi | Gemini Models |\n"
+            "| OpenCode | OpenCode | deepseek-v4.1-flash-free | Batedor | grátis |\n"
+            "| Desconhecido | Antigravity | Modelo X · high | Outro | Gemini Models |\n",
+            encoding="utf-8",
+        )
+        pools = self.cotas_do_caso()
+
+        # 1) Astra high M sem descartado -> RETIDO (custo 960 >= 300)
+        aceitas, retidas, avisos = self.avaliar("### Astra | A1\nTamanho: M\nValide com: pytest\n", pools)
+        self.assertEqual(aceitas, {})
+        self.assertEqual(len(retidas), 1)
+        self.assertIn("RETIDO (custo): Astra | A1", retidas[0])
+        self.assertIn("custo 960", retidas[0])
+        self.assertIn("descartado:", retidas[0])
+
+        # 2) Astra high M com Roteamento descartado ... porque ... -> passa
+        aceitas, retidas, _ = self.avaliar(
+            "### Astra | A2\n"
+            "tamanho: m\n"
+            "roteamento: Astra high | custo 960 | DESCARTADO: Sol medium PORQUE é tarefa N3.\n"
+            "Valide com: pytest\n",
+            pools,
+        )
+        self.assertEqual(retidas, [])
+        self.assertEqual(aceitas["Astra"][4:7], (960, "M", 10))
+
+        # 3) Descartado inválido (vazio, sem 'porque', ou cruzando '|') -> ainda RETIDO (custo)
+        for rot in (
+            "Roteamento: Astra high | descartado: porque sim",
+            "Roteamento: Astra high | descartado: Sol medium",
+            "Roteamento: Astra high | descartado: Sol medium porque | custo 960",
+            "Roteamento: Astra high | descartado: | porque sim",
+        ):
+            with self.subTest(rot=rot):
+                aceitas, retidas, _ = self.avaliar(f"### Astra | A3\nTamanho: M\n{rot}\n", pools)
+                self.assertEqual(aceitas, {})
+                self.assertEqual(len(retidas), 1)
+                self.assertIn("RETIDO (custo)", retidas[0])
+
+        # 3b) Justificativa válida com outro campo separado por '|' depois -> passa
+        aceitas, retidas, _ = self.avaliar(
+            "### Astra | A4\nTamanho: M\n"
+            "Roteamento: Astra high | descartado: Sol medium porque é N3 | custo 960\n",
+            pools,
+        )
+        self.assertEqual(retidas, [])
+        self.assertIn("Astra", aceitas)
+
+        # 4) Hydrogen high P -> passa sem justificativa (custo 60 < 300)
+        aceitas, retidas, _ = self.avaliar("### Hydrogen | H1\nTamanho: P\nOk.\n", pools)
+        self.assertEqual(retidas, [])
+        self.assertEqual(aceitas["Hydrogen"][4:7], (60, "P", 18))
+
+        # 5) Sem linha Tamanho -> assume M com aviso; OpenCode grátis -> custo 0; modelo desconhecido -> só aviso
+        aceitas, retidas, avisos = self.avaliar(
+            "### Hydrogen | H2\nOk.\n"
+            "### OpenCode | O1\nTamanho: G\nOk.\n"
+            "### Orch | OR1\nTamanho: M\nOk.\n"
+            "### Desconhecido | D1\nTamanho: G\nOk.\n",
+            pools,
+        )
+        self.assertEqual(retidas, [])
+        self.assertIn("Hydrogen | H2: sem 'Tamanho: P|M|G' (usando M)", avisos)
+        self.assertIn("Desconhecido | D1: modelo não identificado", avisos)
+        self.assertEqual(aceitas["Hydrogen"][4:6], (180, "M"))
+        self.assertEqual(aceitas["OpenCode"][4:6], (0, "G"))
+        self.assertEqual(aceitas["Orch"][4:6], (180, "M"))
+        self.assertIsNone(aceitas["Desconhecido"][4])
+
+        # 6) --mostrar exibe custo por seção e RETIDO (custo)
+        self.despacho.write_text(
+            "### Astra | A1\nTamanho: M\nValide com: pytest\n"
+            "### Hydrogen | H1\nTamanho: P\nOk.\n",
+            encoding="utf-8",
+        )
+        codigo, saida, _, enviar = self.rodar_lote("--mostrar")
+        self.assertEqual(codigo, 0)
+        self.assertIn("RETIDO (custo): Astra | A1", saida)
+        self.assertIn("===== Hydrogen", saida)
+        self.assertIn("custo 60", saida)
+        self.assertIn("Custo por seção: Astra (A1) custo 960 (M) · Hydrogen (H1) custo 60 (P)", saida)
+        enviar.assert_not_called()
+
+    def test_cotas_custo_por_despacho_ignora_antigas_e_calcula_delta_no_pool(self):
+        agora = datetime.now(timezone.utc)
+        linhas = [
+            # Entradas antigas (6 colunas) -> ignoradas sem erro em custo_por_despacho
+            f"{(agora - timedelta(hours=4)).isoformat()}\tOLD1\tMalho\tGemini\tGemini Models\t\n",
+            f"{(agora - timedelta(hours=3)).isoformat()}\tOLD2\tMalho\tGemini\tGemini Models\t\n",
+            # Mais antiga que 7 dias -> ignorada
+            f"{(agora - timedelta(days=8)).isoformat()}\tD0\tMalho\tGemini\tGemini Models\t\t180\tM\t5\n",
+            # Últimos 7 dias (Malho e Neon compartilham Gemini Models; Prumo tem só 1 despacho)
+            f"{(agora - timedelta(days=2)).isoformat()}\tD1\tMalho\tGemini\tGemini Models\t\t180\tM\t10\n",
+            f"{(agora - timedelta(days=2) + timedelta(minutes=20)).isoformat()}\tD2\tNeon\tGemini\tGemini Models\t\t360\tM\t13\n",
+            f"{(agora - timedelta(days=1)).isoformat()}\tD3\tMalho\tGemini\tGemini Models\t\t60\tP\t19\n",
+            # Reset de janela (19 -> 2) ignorado no delta, mas D4 conta na contagem/custo de Malho
+            f"{(agora - timedelta(hours=6)).isoformat()}\tD4\tMalho\tGemini\tGemini Models\t\t120\tM\t2\n",
+            f"{(agora - timedelta(hours=3)).isoformat()}\tD5\tNeon\tGemini\tGemini Models\t\t180\tM\t6\n",
+            f"{(agora - timedelta(hours=2)).isoformat()}\tD6\tPrumo\tGPT\tCodex\t\t120\tM\t10\n",
+        ]
+        self.log.write_text("".join(linhas), encoding="utf-8")
+        # Malho: D1->D2 delta 3, D3->D4 reset ignorado (só conta delta 3), D4->D5 delta 4 => média (3+4)/2 = 3.5 pp; custos [180, 60, 120] => média 120
+        # Neon: D2->D3 delta 6 (D5 não tem seguinte no pool) => média 6.0 pp; custos [360, 180] => média 270
+        # Prumo: apenas 1 despacho -> não aparece
+        linha = cotas.custo_por_despacho(self.pasta, agora=agora)
+        self.assertEqual(
+            linha,
+            "Custo por despacho (aprox.): Malho 3.5 pp (custo médio 120) · Neon 6.0 pp (custo médio 270)",
+        )
+        # distribuicao_recente lê tanto antigas (6 col) quanto novas (9 col) nas últimas 5h: OLD1, OLD2, D5 (Gemini) e D6 (GPT)
+        dist = cotas.distribuicao_recente(self.pasta, agora=agora)
+        self.assertEqual(dist, "Despachos nas últimas 5 h por família: Claude 0 · GPT 1 · Gemini 3 · aberto 0 · desconhecido 0")
+
+    def test_fallback_parcial_rodape_e_ignora_conversa(self):
+        self.equipe.write_text(
+            "| Terminal | Ferramenta | Modelo | Effort | Pool |\n"
+            "|---|---|---|---|---|\n"
+            "| AstraSemEffort | Codex | GPT-6.2 Astra | | Codex |\n"
+            "| SoEffort | Codex | | high | Codex |\n"
+            "| SemNada | Antigravity | | | Gemini Models |\n",
+            encoding="utf-8",
+        )
+        pools = self.cotas_do_caso()
+        self.preset.side_effect = [
+            ("› pronto\n  gpt-6.2-astra high · 95% left · C:\\proj\n", ""),
+            ("› pronto\n  gpt-6.2-astra medium · 90% left · C:\\proj\n", ""),
+            ("Sugestao: use GPT-6.2 Astra high\n", ""),
+        ]
+        # 1) Modelo sem effort -> completa pelo rodapé (astra high M = 960 -> retido)
+        aceitas, retidas, _ = self.avaliar("### AstraSemEffort | E1\nTamanho: M\n", pools)
+        self.assertEqual(aceitas, {})
+        self.assertIn("RETIDO (custo): AstraSemEffort | E1", retidas[0])
+
+        # 2) Effort sem modelo -> completa modelo do rodapé mantendo effort da formação (astra high M = 960)
+        aceitas, retidas, _ = self.avaliar("### SoEffort | E2\nTamanho: M\n", pools)
+        self.assertEqual(aceitas, {})
+        self.assertIn("RETIDO (custo): SoEffort | E2", retidas[0])
+
+        # 3) Texto da conversa com modelo sem rodapé reconhecível -> só aviso, não retém
+        aceitas, retidas, avisos = self.avaliar("### SemNada | E3\nTamanho: M\n", pools)
+        self.assertEqual(retidas, [])
+        self.assertIn("SemNada | E3: modelo não identificado", avisos)
+        self.assertIsNone(aceitas["SemNada"][4])
+
+    def test_resumo_real_mostra_custo_de_todas_secoes_e_aviso_tamanho_p(self):
+        self.cotas_do_caso()
+        # Inclui Tocha (retida por equilíbrio) e Ferro (falha no envio) e 4 caminhos em Tamanho: P
+        self.despacho.write_text(
+            "### Tocha | T1\nTamanho: M\nFaça o teste.\n"
+            "### Malho | T4\nTamanho: P\n"
+            "Veja https://exemplo.com/a/b/c.html e P/M/G.\n"
+            "Altere skills/maestro-equipe/scripts/maestri_batch.py, "
+            "skills/maestro-equipe/scripts/cotas.py, "
+            ".maestri/equipe.md e tests/test_equilibrio.py.\n"
+            "### Ferro | T5\nTamanho: G\n"
+            "Roteamento: Argon high | descartado: Hydrogen high porque precisa de cuidado.\n"
+            "Faça o teste.\n",
+            encoding="utf-8",
+        )
+        codigo, saida, _, _ = self.rodar_lote("--sem-rodape", falhas={"Ferro": "rejeitado"})
+        self.assertEqual(codigo, 1)
+        self.assertIn("Malho | T4: Tamanho: P com 4 caminhos distintos no corpo", saida)
+        self.assertIn("Custo por seção: Tocha (T1) custo 120 (M) · Malho (T4) custo 60 (P) · Ferro (T5) custo 540 (G)", saida)
+
+    def test_cotas_lote_compartilhado_indeterminado_e_rotulos_contas(self):
+        agora = datetime.now(timezone.utc)
+        linhas = []
+        for idx, uso in enumerate((10, 14, 18), start=1):
+            ts = (agora - timedelta(hours=4 - idx)).isoformat()
+            linhas.append(f"{ts}\tA{idx}\tA\tGemini\tGemini Models\t\t120\tM\t{uso}\n")
+            linhas.append(f"{ts}\tB{idx}\tB\tGemini\tGemini Models\t\t120\tM\t{uso}\n")
+        self.log.write_text("".join(linhas), encoding="utf-8")
+        linha = cotas.custo_por_despacho(self.pasta, agora=agora)
+        self.assertEqual(
+            linha,
+            "Custo por despacho (aprox.): A indeterminado (custo médio 120) · B indeterminado (custo médio 120)",
+        )
+
+        # Rótulos claros de contas Codex e Antigravity Claude/GPT
+        self.status.write_text(json.dumps({"providers": [
+            {
+                "id": "codex", "name": "Codex", "plan": "plus", "state": "ready",
+                "lastSuccessAt": agora.isoformat(),
+                "meters": [{"id": "codex", "label": "Codex", "windows": [
+                    {"durationSeconds": 18000, "usedPercent": 0, "resetsAt": (agora + timedelta(hours=4)).isoformat()},
+                    {"durationSeconds": 604800, "usedPercent": 85, "resetsAt": (agora + timedelta(days=1)).isoformat()},
+                ]}],
+                "notes": ['meters/1: duplicate meter id "codex" skipped'],
+            },
+            {
+                "id": "account-lm", "name": "lm", "plan": "team", "state": "ready",
+                "lastSuccessAt": agora.isoformat(),
+                "meters": [{"id": "codex", "label": "Codex", "windows": [
+                    {"durationSeconds": 18000, "usedPercent": 1, "resetsAt": (agora + timedelta(hours=4)).isoformat()},
+                    {"durationSeconds": 604800, "usedPercent": 0, "resetsAt": (agora + timedelta(days=6)).isoformat()},
+                ]}],
+                "notes": ['meters/1: duplicate meter id "codex" skipped'],
+            },
+            {
+                "id": "antigravity", "name": "Antigravity", "plan": "", "state": "ready",
+                "lastSuccessAt": agora.isoformat(),
+                "meters": [
+                    {"id": "Gemini Models", "label": "Gemini Models", "windows": [
+                        {"durationSeconds": 604800, "usedPercent": 4, "resetsAt": (agora + timedelta(days=6)).isoformat()},
+                    ]},
+                    {"id": "Claude and GPT models", "label": "Claude and GPT models", "windows": [
+                        {"durationSeconds": 604800, "usedPercent": 100, "resetsAt": (agora + timedelta(days=3)).isoformat()},
+                    ]},
+                ],
+            },
+        ]}), encoding="utf-8")
+        pools, avisos = cotas.ler_cotas()
+        resumo = "\n".join(cotas.resumo_linhas(pools, avisos))
+        self.assertIn("Codex conta Padrão [plus] / Codex: 5h 0%", resumo)
+        self.assertIn("semanal 85%", resumo)
+        self.assertIn("Codex conta lm [team] / Codex: 5h 1%", resumo)
+        self.assertIn("Antigravity / Claude and GPT models (cota Claude/GPT do plano Gemini, não o Claude Pro)", resumo)
+
+        # Rollout de plano diferente (team) não sobrescreve conta Padrão (plus) antiga
+        dados = json.loads(self.status.read_text(encoding="utf-8"))
+        dados["providers"][0]["lastSuccessAt"] = (agora - timedelta(hours=2)).isoformat()
+        self.status.write_text(json.dumps(dados), encoding="utf-8")
+        codex_home = self.raiz / "codex_home"
+        sess = codex_home / "sessions"
+        sess.mkdir(parents=True)
+        (sess / "rollout-1.jsonl").write_text(json.dumps({
+            "type": "event_msg",
+            "timestamp": agora.isoformat(),
+            "payload": {
+                "type": "token_count",
+                "rate_limits": {
+                    "limit_id": "codex",
+                    "plan_type": "team",
+                    "primary": {"window_minutes": 300, "used_percent": 1, "resets_at": int((agora + timedelta(hours=4)).timestamp())},
+                    "secondary": {"window_minutes": 10080, "used_percent": 0, "resets_at": int((agora + timedelta(days=6)).timestamp())},
+                },
+            },
+        }) + "\n", encoding="utf-8")
+        with patch.dict(os.environ, {"CODEX_HOME": str(codex_home)}):
+            pools2, avisos2 = cotas.ler_cotas()
+        resumo2 = "\n".join(cotas.resumo_linhas(pools2, avisos2))
+        self.assertIn("Codex conta Padrão [plus] / Codex: 5h 0%", resumo2)
+        self.assertIn("semanal 85%", resumo2)
+        self.assertNotIn("suprida pelo rollout local", resumo2)
+
+    def test_duas_contas_codex_pools_separados_equilibrio_e_custo(self):
+        agora = self.agora
+        self.status.write_text(json.dumps({"providers": [
+            {
+                "id": "codex", "name": "Codex", "plan": "plus", "state": "ready",
+                "lastSuccessAt": agora.isoformat(),
+                "meters": [{"id": "codex", "label": "Codex", "windows": [
+                    {"durationSeconds": 18000, "usedPercent": 0, "resetsAt": (agora + timedelta(hours=4)).isoformat()},
+                    {"durationSeconds": 604800, "usedPercent": 85, "resetsAt": (agora + timedelta(days=1)).isoformat()},
+                ]}],
+            },
+            {
+                "id": "account-lm", "name": "lm", "plan": "team", "state": "ready",
+                "lastSuccessAt": agora.isoformat(),
+                "meters": [{"id": "codex", "label": "Codex", "windows": [
+                    {"durationSeconds": 18000, "usedPercent": 0, "resetsAt": (agora + timedelta(hours=4)).isoformat()},
+                    {"durationSeconds": 604800, "usedPercent": 0, "resetsAt": (agora + timedelta(days=6)).isoformat()},
+                ]}],
+            },
+            {
+                "id": "antigravity", "name": "Antigravity", "plan": "", "state": "ready",
+                "lastSuccessAt": agora.isoformat(),
+                "meters": [{"id": "Gemini Models", "label": "Gemini Models", "windows": [
+                    {"durationSeconds": 604800, "usedPercent": 18, "resetsAt": (agora + timedelta(days=6)).isoformat()},
+                ]}],
+            },
+        ]}), encoding="utf-8")
+        pools, _ = cotas.ler_cotas()
+
+        # 1) Pela formação .maestri/equipe.md ("Codex (conta lm)" vs Padrão)
+        self.equipe.write_text(
+            "| Terminal | Ferramenta | Modelo · effort | Perfis |\n"
+            "|---|---|---|---|\n"
+            "| SolPadrao | Codex | GPT-6.2 Sol · medium | Volume |\n"
+            "| SolLM | Codex (conta lm) | GPT-6.2 Sol · medium | Volume |\n"
+            "| AstraLM | Codex (conta lm) | GPT-6.2 Astra · high | N3 |\n",
+            encoding="utf-8",
+        )
+        aceitas, retidas, _ = self.avaliar(
+            "### SolPadrao | P1\nTamanho: M\nValide com: pytest\n"
+            "### SolLM | L1\nTamanho: M\nValide com: pytest\n"
+            "### AstraLM | A1\nTamanho: M\nValide com: pytest\n",
+            pools,
+        )
+        # SolPadrao (85% vs lm 0%) -> RETIDO (equilíbrio); SolLM (0%) -> passa; AstraLM (0%, custo 960) -> RETIDO (custo)
+        self.assertNotIn("SolPadrao", aceitas)
+        self.assertIn("SolLM", aceitas)
+        self.assertEqual(aceitas["SolLM"][2], "Codex (conta lm)")
+        self.assertEqual(aceitas["SolLM"][6], 0)
+        self.assertNotIn("AstraLM", aceitas)
+        self.assertTrue(any("RETIDO (equilíbrio): SolPadrao | P1: Codex 85%" in r for r in retidas))
+        self.assertTrue(any("RETIDO (custo): AstraLM | A1" in r for r in retidas))
+
+        # 2) Pelo campo account do maestri list (mesmo sem conta anotada na formação)
+        self.equipe.write_text(
+            "| Terminal | Ferramenta | Modelo · effort | Perfis |\n"
+            "|---|---|---|---|\n"
+            "| SolPadrao | Codex | GPT-6.2 Sol · medium | Volume |\n"
+            "| SolLM | Codex | GPT-6.2 Sol · medium | Volume |\n",
+            encoding="utf-8",
+        )
+        self.despacho.write_text(
+            "### SolPadrao | P2\nTamanho: M\nValide com: pytest\n"
+            "### SolLM | L2\nTamanho: M\nValide com: pytest\n",
+            encoding="utf-8",
+        )
+        listagem = (
+            "You:\n"
+            '  - name: "Maestro", role: "Maestro"\n'
+            "Connected agents:\n"
+            '  - name: "SolPadrao", cli: "codex", account: "Padrão"\n'
+            '  - name: "SolLM", cli: "codex", account: "lm"\n'
+        )
+        argv = ["maestri_batch.py", str(self.despacho), "--raiz", str(self.raiz), "--sem-rodape"]
+        saida = Saida()
+        with (patch.object(sys, "argv", argv), redirect_stdout(saida),
+              patch.object(batch, "maestri_exe", return_value="maestri"),
+              patch.object(batch, "ler_list", return_value=("Maestro", {"SolPadrao", "SolLM"}, listagem)),
+              patch.object(batch, "tela", return_value=""),
+              patch.object(batch, "esperar_pronto", return_value=None),
+              patch.object(batch, "enviar_tudo", side_effect=lambda exe, prompts, *a, **kw: {
+                  ag: ("entregue", None) for ag in prompts
+              }) as enviar):
+            codigo = batch.main()
+        self.assertEqual(codigo, 1)  # SolPadrao foi retido
+        self.assertEqual(list(enviar.call_args.args[1]), ["SolLM"])
+        self.assertIn("RETIDO (equilíbrio): SolPadrao | P2: Codex 85%", saida.getvalue())
+        linhas_log = [l.split("\t") for l in self.log.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(len(linhas_log), 1)
+        self.assertEqual(linhas_log[0][2:9], ["SolLM", "GPT", "Codex (conta lm)", "", "120", "M", "0"])
 
 
 if __name__ == "__main__":

@@ -49,9 +49,80 @@ LIMITE_JSON = 24000
 LIMIAR_EQUILIBRIO = 15
 LIMIAR_GEMINI_SEMANAL = 80
 LIMIAR_GEMINI_5H = 90
+LIMIAR_CUSTO = 300
+PESOS_MODELO = {
+    "luna": 1,
+    "haiku": 1,
+    "flash": 1,
+    "opencode grátis": 0,
+    "terra": 10,
+    "hydrogen": 15,
+    "argon": 15,
+    "sol": 20,
+    "sonnet": 20,
+    "neon": 30,
+    "orchestrator": 30,
+    "opus": 40,
+    "astra": 80,
+    "fable": 80,
+}
+PESOS_EFFORT = {
+    "low": 1,
+    "medium": 2,
+    "high": 4,
+    "xhigh": 8,
+    "max": 16,
+    "ultra": 16,
+}
+PESOS_TAMANHO = {
+    "P": 1,
+    "M": 3,
+    "G": 9,
+}
 COLUNAS_CLI = ("ferramenta", "cli", "preset", "preset/modelo", "modelo", "modelo · effort", "modelo/effort", "pool")
 RE_PRESET_FORMACAO = re.compile(r"^(.+?)\s*\(preset\s+([^)+]+)(?:\s*\+\s*`--command\s+(.+?)`)?", re.I)
+RE_CONTA_FORMACAO = re.compile(r'\bconta\s*[:=]?\s*(?:"([^"]+)"|([^\s),;|]+))', re.I)
+RE_CONTA_LIST = re.compile(r'\baccount\s*:\s*(?:"([^"]+)"|([^,|\s]+))', re.I)
 RE_MOTIVO_POOL = re.compile(r"^Motivo pool:\s*(\S.*)", re.I)
+RE_TAMANHO = re.compile(r"^Tamanho:\s*([PMG])(?:\s|$)", re.I)
+RE_ROTEAMENTO = re.compile(r"^Roteamento:\s*(\S.*)", re.I)
+RE_JUSTIFICATIVA_CUSTO = re.compile(
+    r"\bdescartado:\s*(?!porque\b)[^\s|][^|]*?\bporque(?:\s*:\s*|\s+)[^\s|]",
+    re.I,
+)
+RE_MODELO_PESO = re.compile(
+    r"\b(orchestrator|luna|haiku|flash|terra|hydrogen|argon|sol|sonnet|neon|opus|astra|fable)\b",
+    re.I,
+)
+RE_EFFORT = re.compile(r"\b(xhigh|low|medium|high|max|ultra)\b", re.I)
+RE_MODELO_TELA = re.compile(
+    r"\b(gemini[-\s]\d+(?:\.\d+)?[-\s](?:neon|hydrogen|argon|flash|carbon)"
+    r"|gemini-pro-orchestrator-(?:neon|g1-pro)"
+    r"|claude[-\s]+(?:opus|sonnet|haiku|fable)(?:[-\s]+\d+(?:\.\d+)?)?"
+    r"|gpt[-\s]+\d+(?:\.\d+)?[-\s]+(?:luna|terra|sol|astra)"
+    r"|(?:opencode/)?[^\s]+-free)\b",
+    re.I,
+)
+RE_MARCADOR_RODAPE = re.compile(
+    r"(?:shift\+tab|for shortcuts|auto mode|accept edits|bypass permissions|"
+    r"esc to interrupt|context left|\d+%\s*left|\b(?:Build|Plan)\s*·|\bctrl\+\w)",
+    re.I,
+)
+RE_STATUS_AGY_AUTO = re.compile(
+    r"\((?:xhigh|low|medium|high|max|ultra)\)\s+auto\b",
+    re.I,
+)
+RE_STATUS_CODEX_RODAPE = re.compile(
+    r"\bgpt-\d+(?:\.\d+)?-(?:luna|terra|sol|astra)\b[^·\n]*\b(?:xhigh|low|medium|high|max|ultra)\b\s*·",
+    re.I,
+)
+RE_URL = re.compile(r"\b(?:https?|file)://\S+", re.I)
+RE_CAMINHO_BARRA = re.compile(r"(?<![:\w])(?:[A-Za-z]:[\\/]|\.{1,2}[\\/]|[\w.-]+[\\/])[\w.@-]+(?:[\\/][\w.@-]+)*[\\/]?")
+RE_ARQUIVO_EXT = re.compile(
+    r"\b[\w.-]+\.(?:py|js|jsx|ts|tsx|mjs|cjs|json|md|txt|yaml|yml|toml|ini|cfg|html|css|scss|"
+    r"sql|sh|ps1|bat|cmd|go|rs|java|kt|swift|c|cpp|h|hpp|rb|php|dart|xml|csv|log|env)\b",
+    re.I,
+)
 RE_SECAO = re.compile(r"^###\s+(.+?)\s*(?:\|\s*([A-Za-z0-9][\w.\-]*))?\s*$")
 RE_PERMISSAO = re.compile(
     r"(do you want to"
@@ -317,6 +388,19 @@ def ferramentas_list(texto):
     return ferramentas
 
 
+def contas_list(texto):
+    contas = {}
+    for linha in texto.splitlines():
+        nome = re.search(r'name:\s*"([^"]+)"', linha)
+        if nome:
+            m = RE_CONTA_LIST.search(linha[nome.end():])
+            if m:
+                valor = (m.group(1) or m.group(2) or "").strip()
+                if valor and valor != "-":
+                    contas[nome.group(1)] = valor
+    return contas
+
+
 def ler_formacao(raiz):
     """Lê as linhas das tabelas que identificam terminais da formação."""
     try:
@@ -354,11 +438,23 @@ def ferramentas_formacao(raiz, formacao=None):
     return ferramentas
 
 
+def _conta_padrao(conta):
+    return not conta or conta.strip().casefold() in ("padrão", "padrao", "default", "built-in")
+
+
 def nome_pool(cota):
     if cota["via_claude"] == "Claude Code" and cota["plano"]:
         return f"Claude {cota['plano'].title()}"
     if cota["via_claude"] == "Antigravity":
         return "Claude and GPT models"
+    if cota.get("eh_codex") or (
+        cota.get("medidor", "").casefold() == "codex"
+        and cota.get("provedor", "").casefold() not in ("codex", "")
+    ):
+        conta = cota.get("conta") or (
+            "Padrão" if cota.get("provedor", "").casefold() in ("codex", "") else cota["provedor"]
+        )
+        return "Codex" if _conta_padrao(conta) else f"Codex (conta {conta})"
     return cota["medidor"]
 
 
@@ -379,18 +475,91 @@ def _classificar_comando(comando, plano_claude, medidores):
     return "desconhecido", "desconhecido"
 
 
-def _modelo_rodape_agy(exe, agente):
-    """Lê o modelo Gemini no rodapé da tela do Antigravity (via `maestri check`)."""
+def _ler_tela_limpa(exe, agente, telas):
+    """Lê a saída de `maestri check` sem ANSI, cacheando por agente na avaliação."""
     if not exe or not agente:
         return ""
-    saida, _ = rodar([exe, "check", agente], timeout=3)
-    if not saida:
-        return ""
-    limpa = RE_ANSI.sub("", saida)
-    achados = RE_MODELO_AGY_TELA.findall(limpa)
-    if not achados:
-        return ""
-    return re.sub(r"[^\w]+", "-", achados[-1].casefold()).strip("-")
+    if agente not in telas:
+        saida, _ = rodar([exe, "check", agente], timeout=3)
+        telas[agente] = RE_ANSI.sub("", saida) if saida else ""
+    return telas[agente]
+
+
+def _eh_linha_rodape(linha):
+    return bool(
+        RE_MARCADOR_RODAPE.search(linha)
+        or (RE_MODELO_TELA.search(linha) and RE_STATUS_AGY_AUTO.search(linha))
+        or RE_STATUS_CODEX_RODAPE.search(linha)
+    )
+
+
+def _linhas_rodape(limpa):
+    """Retorna apenas as linhas finais da tela que correspondem a uma barra de status reconhecível."""
+    if not limpa:
+        return []
+    cauda = [l for l in limpa.splitlines() if l.strip()][-6:]
+    return [l for l in cauda if _eh_linha_rodape(l)]
+
+
+def _modelo_rodape_agy(exe, agente, telas=None):
+    """Lê o modelo Gemini no rodapé da tela do Antigravity (via `maestri check`)."""
+    limpa = _ler_tela_limpa(exe, agente, telas if telas is not None else {})
+    for linha in reversed(_linhas_rodape(limpa)):
+        achados = RE_MODELO_AGY_TELA.findall(linha)
+        if achados:
+            return re.sub(r"[^\w]+", "-", achados[-1].casefold()).strip("-")
+    return ""
+
+
+def _extrair_modelo_peso(texto, *, opencode=False, pool=""):
+    if not texto:
+        return "opencode grátis" if pool == "grátis" else None
+    if pool == "grátis" or (opencode and re.search(r"(?:-free\b|\bgr[aá]tis\b|\bbig-pickle\b)", texto, re.I)):
+        return "opencode grátis"
+    if re.search(r"(?:-free\b|\bbig-pickle\b|\bopencode\s+gr[aá]tis\b)", texto, re.I):
+        return "opencode grátis"
+    m = RE_MODELO_PESO.search(texto)
+    return m.group(1).lower() if m else None
+
+
+def _extrair_effort(texto):
+    if not texto:
+        return None
+    m = RE_EFFORT.search(texto)
+    return m.group(1).lower() if m else None
+
+
+def _modelo_effort_tela(limpa):
+    """Extrai (modelo_peso, effort) apenas de uma linha de rodapé reconhecível."""
+    for linha in reversed(_linhas_rodape(limpa)):
+        achados = list(RE_MODELO_TELA.finditer(linha))
+        if achados:
+            return _extrair_modelo_peso(achados[-1].group(0)), _extrair_effort(linha)
+        modelo = _extrair_modelo_peso(linha)
+        if modelo is not None:
+            return modelo, _extrair_effort(linha)
+    return None, None
+
+
+def _caminhos_distintos(linhas):
+    """Conta caminhos de arquivo distintos no corpo da seção (ignorando metadados e URLs)."""
+    caminhos = set()
+    for linha in linhas:
+        if RE_TAMANHO.match(linha) or RE_ROTEAMENTO.match(linha) or RE_MOTIVO_POOL.match(linha):
+            continue
+        sem_urls = RE_URL.sub(" ", linha)
+        spans = []
+        for m in RE_CAMINHO_BARRA.finditer(sem_urls):
+            trecho = m.group(0).strip("`\"'.,;:()[]")
+            if ("\\" in trecho or re.match(r"^(?:[A-Za-z]:|\.{1,2}[\\/])", trecho)
+                    or RE_ARQUIVO_EXT.search(trecho) or trecho.endswith("/")):
+                caminhos.add(re.sub(r"^(?:\./)+", "", trecho.replace("\\", "/")).casefold())
+                spans.append((m.start(), m.end()))
+        for m in RE_ARQUIVO_EXT.finditer(sem_urls):
+            if any(ini <= m.start() and m.end() <= fim for ini, fim in spans):
+                continue
+            caminhos.add(m.group(0).strip("`\"'.,;:()[]").casefold())
+    return caminhos
 
 
 def _gemini_apertado(cota):
@@ -409,16 +578,38 @@ def _gemini_apertado(cota):
     return cota.get("uso_max") is not None and cota["uso_max"] >= LIMIAR_GEMINI_SEMANAL
 
 
-def pool_do_destino(exe, linha, plano_claude, medidores, comandos, agente=""):
+def _conta_da_formacao(linha, ferr_bruta):
+    conta_col = linha.get("conta", "").strip()
+    if conta_col:
+        m = RE_CONTA_FORMACAO.search(conta_col)
+        return (m.group(1) or m.group(2)).strip() if m else conta_col
+    for texto in (ferr_bruta, linha.get("pool", "")):
+        if m := RE_CONTA_FORMACAO.search(texto or ""):
+            return (m.group(1) or m.group(2)).strip()
+    return ""
+
+
+def _resolver_pool_codex(conta_efetiva, pools_por_nome):
+    if _conta_padrao(conta_efetiva):
+        return "Codex"
+    alvo = f"Codex (conta {conta_efetiva})"
+    return next((nome for nome in pools_por_nome if nome.casefold() == alvo.casefold()), alvo)
+
+
+def destino_do_agente(exe, linha, plano_claude, medidores, comandos, telas, agente="", conta="", pools_por_nome=()):
+    """Descobre (familia, pool, modelo_peso, effort) usando equipe.md e fallback na tela."""
     ferr_bruta = linha.get("ferramenta", "").strip()
+    conta_formacao = _conta_da_formacao(linha, ferr_bruta)
+    ferr_sem_conta = re.sub(r"\(\s*conta\s+[^)]+\)", "", ferr_bruta, flags=re.I).strip()
     modelo_col = linha.get("modelo") or next((v for k, v in linha.items() if k.startswith("modelo")), "")
+    effort_col = linha.get("effort", "").strip()
     modelo_bruto = re.split(r"[·,]", re.sub(r"\s*\([^)]*\)", "", modelo_col))[0].strip()
     pool_declarado = re.sub(r"\s*\([^)]*\)", "", linha.get("pool", "")).strip()
     comando, ferramenta_declarada, preset = "", "", ""
-    achado = RE_PRESET_FORMACAO.match(ferr_bruta)
+    achado = RE_PRESET_FORMACAO.match(ferr_sem_conta)
     if achado:
         ferramenta_declarada, preset, comando_extra = achado.groups()
-        preset = preset.strip()
+        preset = re.sub(r"[,;]\s*conta\s+.*$", "", preset, flags=re.I).strip()
         if comando_extra:
             comando = comando_extra.strip().strip("'\"")
         else:
@@ -426,31 +617,63 @@ def pool_do_destino(exe, linha, plano_claude, medidores, comandos, agente=""):
                 detalhes, _ = rodar([exe, "preset", "show", preset], timeout=5) if exe else (None, None)
                 comandos[preset] = comando_preset(detalhes)
             comando = comandos[preset]
-    elif ferr_bruta:
-        ferramenta_declarada = re.sub(r"\s*\([^)]*\)", "", ferr_bruta).strip()
+    elif ferr_sem_conta:
+        ferramenta_declarada = re.sub(r"\s*\([^)]*\)", "", ferr_sem_conta).strip()
         if ferramenta_declarada.casefold() == "agy":
             ferramenta_declarada = "Antigravity"
     if not CLI_PRESET.search(comando) and ferramenta_declarada:
         comando = comando_da_formacao(ferramenta_declarada, modelo_bruto, preset or pool_declarado or modelo_bruto)
+
+    familia, pool = "desconhecido", "desconhecido"
     if comando:
         familia, pool = _classificar_comando(comando, plano_claude, medidores)
-        if pool != "desconhecido":
-            return familia, pool
-    if pool_declarado and ferramenta_declarada.casefold() in ("antigravity", "agy", ""):
+    if pool == "desconhecido" and pool_declarado.casefold() == "codex":
+        familia, pool = "GPT", "Codex"
+    if pool == "desconhecido" and pool_declarado and ferramenta_declarada.casefold() in ("antigravity", "agy", ""):
         por_nome = {m.casefold(): m for m in medidores}
         if pool_declarado.casefold() in por_nome:
-            pool_real = por_nome[pool_declarado.casefold()]
-            familia = "Gemini" if pool_real != "Claude and GPT models" else (
+            pool = por_nome[pool_declarado.casefold()]
+            familia = "Gemini" if pool != "Claude and GPT models" else (
                 "Claude" if "claude" in modelo_bruto.casefold() else "GPT"
             )
-            return familia, pool_real
-    modelo_tela = _modelo_rodape_agy(exe, agente)
-    if modelo_tela:
-        return _classificar_comando(f"agy --model {modelo_tela}", plano_claude, medidores)
-    return "desconhecido", "desconhecido"
+    if pool == "desconhecido":
+        modelo_tela = _modelo_rodape_agy(exe, agente, telas)
+        if modelo_tela:
+            familia, pool = _classificar_comando(f"agy --model {modelo_tela}", plano_claude, medidores)
+
+    eh_opencode = ferramenta_declarada.casefold() == "opencode" or pool == "grátis" or familia == "aberto"
+    texto_modelo_formacao = modelo_col.strip() or (
+        MODELO_PRESET.search(comando).group(1) if MODELO_PRESET.search(comando) else ""
+    )
+    modelo_nome = (
+        _extrair_modelo_peso(texto_modelo_formacao, opencode=eh_opencode, pool=pool)
+        if texto_modelo_formacao else None
+    )
+    effort_nome = _extrair_effort(f"{modelo_col} {effort_col}") or _extrair_effort(comando)
+
+    falta_modelo = not texto_modelo_formacao
+    falta_effort = effort_nome is None and modelo_nome != "opencode grátis"
+    if falta_modelo or falta_effort:
+        limpa = _ler_tela_limpa(exe, agente, telas)
+        modelo_tela, effort_tela = _modelo_effort_tela(limpa)
+        if falta_modelo:
+            modelo_nome = modelo_tela or ("opencode grátis" if eh_opencode else None)
+        if effort_nome is None:
+            effort_nome = effort_tela
+        if pool == "desconhecido" and modelo_nome in ("luna", "terra", "sol", "astra"):
+            familia, pool = "GPT", "Codex"
+
+    if pool == "Codex":
+        pool = _resolver_pool_codex((conta or conta_formacao or "").strip(), pools_por_nome)
+    return familia, pool, modelo_nome, effort_nome
 
 
-def avaliar_equilibrio(exe, formacao, secoes, pools):
+def pool_do_destino(exe, linha, plano_claude, medidores, comandos, agente=""):
+    familia, pool, _, _ = destino_do_agente(exe, linha, plano_claude, medidores, comandos, {}, agente)
+    return familia, pool
+
+
+def avaliar_equilibrio(exe, formacao, secoes, pools, resumo_custos=None, contas=None):
     plano_claude = next((p["plano"].title() for p in pools
                          if p["via_claude"] == "Claude Code" and p["plano"]), "")
     medidores = dict.fromkeys(p["medidor"] for p in pools if p["provedor"].casefold() == "antigravity")
@@ -458,17 +681,50 @@ def avaliar_equilibrio(exe, formacao, secoes, pools):
         if medidor.casefold() not in {m.casefold() for m in medidores}:
             medidores[medidor] = None
     por_pool = {nome_pool(p): p for p in pools}
+    contas = contas or {}
     menor = min((p for p in pools if p["estado"] == "ready" and p["uso_max"] is not None
                  and not p["veto_despacho"] and nome_pool(p).casefold() not in ("grátis", "opencode")
                  and p["provedor"].casefold() != "opencode"
                  and p["plano"].casefold() not in ("free", "grátis", "gratis")),
                 key=lambda p: p["uso_max"], default=None)
-    comandos, aceitas, retencoes = {}, {}, []
+    comandos, telas, aceitas, retencoes = {}, {}, {}, []
     for secao in secoes:
         agente, ident = secao["agente"], secao["id"] or "-"
-        familia, pool = pool_do_destino(exe, formacao.get(agente, {}), plano_claude, medidores, comandos, agente)
+        familia, pool, modelo_nome, effort_nome = destino_do_agente(
+            exe, formacao.get(agente, {}), plano_claude, medidores, comandos, telas,
+            agente, conta=contas.get(agente, ""), pools_por_nome=por_pool,
+        )
         motivo = next((m.group(1).strip() for linha in secao["linhas"] if (m := RE_MOTIVO_POOL.match(linha))), None)
+        tamanho = next((m.group(1).upper() for linha in secao["linhas"] if (m := RE_TAMANHO.match(linha))), None)
+        if tamanho is None:
+            tamanho = "M"
+            print(f"aviso: {agente} | {ident}: sem 'Tamanho: P|M|G' (usando M)")
+        elif tamanho == "P":
+            caminhos = _caminhos_distintos(secao["linhas"])
+            if len(caminhos) > 3:
+                print(
+                    f"aviso: {agente} | {ident}: Tamanho: P com {len(caminhos)} caminhos distintos no corpo "
+                    "(considere M ou quebrar)"
+                )
+        roteamento = next((m.group(1).strip() for linha in secao["linhas"] if (m := RE_ROTEAMENTO.match(linha))), None)
+
+        if modelo_nome == "opencode grátis":
+            custo = 0
+        elif modelo_nome is None:
+            print(f"aviso: {agente} | {ident}: modelo não identificado (sem trava de custo)")
+            custo = None
+        elif effort_nome is None:
+            print(f"aviso: {agente} | {ident}: effort não identificado para {modelo_nome} (sem trava de custo)")
+            custo = None
+        else:
+            custo = PESOS_MODELO[modelo_nome] * PESOS_EFFORT[effort_nome] * PESOS_TAMANHO[tamanho]
+
+        if resumo_custos is not None:
+            resumo_custos[agente] = (ident, custo, tamanho)
+
         cota = por_pool.get(pool)
+        uso_pool = cota["uso_max"] if (cota and cota["estado"] == "ready" and cota["uso_max"] is not None) else None
+        retida = False
         if pool == "desconhecido":
             print(f"aviso: {agente} | {ident}: pool desconhecido")
         elif pool != "grátis":
@@ -483,20 +739,42 @@ def avaliar_equilibrio(exe, formacao, secoes, pools):
                         f"(Gemini apertado: semanal ≥{LIMIAR_GEMINI_SEMANAL}% ou 5h ≥{LIMIAR_GEMINI_5H}%; "
                         f"menor {nome_pool(menor)} {round(menor['uso_max'])}%); reencaminhe ou justifique com 'Motivo pool:'"
                     )
-                    continue
+                    retida = True
             elif cota["uso_max"] - menor["uso_max"] >= LIMIAR_EQUILIBRIO and motivo is None:
                 retencoes.append(
                     f"RETIDO (equilíbrio): {agente} | {ident}: {pool} {round(cota['uso_max'])}% vs "
                     f"{nome_pool(menor)} {round(menor['uso_max'])}%; reencaminhe ou justifique com 'Motivo pool:'"
                 )
-                continue
-        aceitas[agente] = (ident, familia, pool, motivo or "")
+                retida = True
+        if custo is not None and custo >= LIMIAR_CUSTO and (
+            not roteamento or not RE_JUSTIFICATIVA_CUSTO.search(roteamento)
+        ):
+            par = f"{modelo_nome} {effort_nome}".strip()
+            retencoes.append(
+                f"RETIDO (custo): {agente} | {ident}: {par} {tamanho} (custo {custo} ≥ {LIMIAR_CUSTO}); "
+                "quebre/rebaixe ou justifique com 'Roteamento: ... descartado: <par> porque <motivo>'"
+            )
+            retida = True
+        if retida:
+            continue
+        aceitas[agente] = (ident, familia, pool, motivo or "", custo, tamanho, uso_pool)
     return aceitas, retencoes
 
 
-def imprimir_equilibrio(retencoes, distribuicao):
+def _texto_custo(custo, tamanho):
+    return f"custo {custo} ({tamanho})" if custo is not None else f"custo ? ({tamanho})"
+
+
+def imprimir_equilibrio(retencoes, distribuicao, custos=None):
     for retencao in retencoes:
         print(retencao)
+    if custos:
+        partes = []
+        for agente, dados in custos.items():
+            custo, tamanho = (dados[1], dados[2]) if len(dados) == 3 else (dados[4], dados[5])
+            partes.append(f"{agente} ({dados[0]}) {_texto_custo(custo, tamanho)}")
+        if partes:
+            print("Custo por seção: " + " · ".join(partes))
     print("Distribuição do lote: " + formatar_distribuicao(dados[1] for dados in distribuicao))
 
 
@@ -506,8 +784,12 @@ def registrar_envios(pasta, inicio, envios):
     data = datetime.fromtimestamp(inicio, timezone.utc).isoformat()
     try:
         with (pasta / LOG_DISTRIBUICAO).open("ab", buffering=0) as log:
-            for agente, (ident, familia, pool, motivo) in envios.items():
-                campos = (data, ident, agente, familia, pool, motivo)
+            for agente, dados in envios.items():
+                ident, familia, pool, motivo = dados[:4]
+                custo, tamanho, uso_pool = dados[4:7] if len(dados) >= 7 else (None, "", None)
+                custo_str = "" if custo is None else str(custo)
+                uso_str = "" if uso_pool is None else f"{uso_pool:g}"
+                campos = (data, ident, agente, familia, pool, motivo, custo_str, tamanho, uso_str)
                 linha = "\t".join(c.replace("\t", " ").replace("\r", " ").replace("\n", " ") for c in campos)
                 log.write((linha + "\n").encode("utf-8"))
     except OSError as exc:
@@ -743,13 +1025,17 @@ def main() -> int:
         pools, avisos_cotas = [], [f"falha ao ler cotas: {exc}"]
     for aviso in avisos_cotas:
         print(f"aviso: {aviso}")
-    aceitas, retencoes = avaliar_equilibrio(exe, formacao, secoes, pools)
+    custos_todas = {}
+    contas = contas_list(listagem)
+    aceitas, retencoes = avaliar_equilibrio(
+        exe, formacao, secoes, pools, resumo_custos=custos_todas, contas=contas,
+    )
     secoes = [s for s in secoes if s["agente"] in aceitas]
     if not args.mostrar:
         faltam = [s["agente"] for s in secoes if s["agente"] not in conectados]
         if faltam:
             print(f"ERRO: não conectados: {', '.join(faltam)}. Conectados: {', '.join(sorted(conectados)) or 'nenhum'}")
-            imprimir_equilibrio(retencoes, ())
+            imprimir_equilibrio(retencoes, (), custos=custos_todas)
             return 2
 
     ferramentas = {**ferramentas_formacao(raiz, formacao), **ferramentas_list(listagem)}
@@ -768,8 +1054,9 @@ def main() -> int:
 
     if args.mostrar:
         for a, p in prompts.items():
-            print(f"===== {a} ({len(p)} caracteres)\n{p}\n")
-        imprimir_equilibrio(retencoes, aceitas.values())
+            custo_txt = _texto_custo(aceitas[a][4], aceitas[a][5])
+            print(f"===== {a} ({len(p)} caracteres | {custo_txt})\n{p}\n")
+        imprimir_equilibrio(retencoes, aceitas.values(), custos=custos_todas)
         return 0
 
     pasta.mkdir(parents=True, exist_ok=True)
@@ -789,7 +1076,7 @@ def main() -> int:
         print(f"== {agente} ({ids[agente] or '-'}): NÃO ENVIADO, {motivo}")
         prompts.pop(agente)
     if not prompts:
-        imprimir_equilibrio(retencoes, ())
+        imprimir_equilibrio(retencoes, (), custos=custos_todas)
         return 1
     relatorios = {}
     if not args.sem_rodape:
@@ -874,7 +1161,7 @@ def main() -> int:
             print(f"== {agente} ({ident}): terminou sem relatório; últimas linhas:")
             print("\n".join("   " + l[:200] for l in cauda))
         falhou = falhou or not args.sem_rodape
-    imprimir_equilibrio(retencoes, envios.values())
+    imprimir_equilibrio(retencoes, envios.values(), custos=custos_todas)
     return 1 if falhou else 0
 
 

@@ -54,7 +54,7 @@ def distribuicao_recente(pasta, agora=None):
         with (pasta / LOG_DISTRIBUICAO).open(encoding="utf-8", errors="replace") as linhas:
             for linha in linhas:
                 campos = linha.rstrip("\r\n").split("\t")
-                if len(campos) == 6:
+                if len(campos) >= 6:
                     data = _data(campos[0])
                     if data is not None and limite <= data <= agora:
                         familias.append(campos[3])
@@ -63,6 +63,88 @@ def distribuicao_recente(pasta, agora=None):
     except OSError as exc:
         return f"aviso: não foi possível ler {LOG_DISTRIBUICAO}: {exc}"
     return "Despachos nas últimas 5 h por família: " + formatar_distribuicao(familias)
+
+
+def custo_por_despacho(pasta, agora=None):
+    """Média de delta de uso do pool (pp) e de custo estimado por terminal nos últimos 7 dias."""
+    agora = agora or datetime.now(timezone.utc)
+    limite = agora - timedelta(days=7)
+    entradas = []
+    try:
+        with (pasta / LOG_DISTRIBUICAO).open(encoding="utf-8", errors="replace") as linhas:
+            for idx, linha in enumerate(linhas):
+                campos = linha.rstrip("\r\n").split("\t")
+                if len(campos) < 9:
+                    continue
+                data = _data(campos[0])
+                if data is None or not (limite <= data <= agora):
+                    continue
+                agente = campos[2].strip()
+                if not agente:
+                    continue
+                entradas.append({
+                    "data": data,
+                    "idx": idx,
+                    "agente": agente,
+                    "pool": campos[4].strip(),
+                    "custo": _numero(campos[6]),
+                    "uso": _numero(campos[8]),
+                })
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        return f"aviso: não foi possível ler {LOG_DISTRIBUICAO}: {exc}"
+
+    if not entradas:
+        return None
+    entradas.sort(key=lambda e: (e["data"], e["idx"]))
+
+    contagem = {}
+    custos = {}
+    por_pool = {}
+    for e in entradas:
+        agente = e["agente"]
+        contagem[agente] = contagem.get(agente, 0) + 1
+        if e["custo"] is not None:
+            custos.setdefault(agente, []).append(e["custo"])
+        por_pool.setdefault(e["pool"], []).append(e)
+
+    deltas = {}
+    compartilhados = set()
+    for pool, lista in por_pool.items():
+        if pool == "desconhecido":
+            continue
+        lotes = []
+        for e in lista:
+            if lotes and lotes[-1]["data"] == e["data"]:
+                lotes[-1]["agentes"].add(e["agente"])
+                if lotes[-1]["uso"] is None and e["uso"] is not None:
+                    lotes[-1]["uso"] = e["uso"]
+            else:
+                lotes.append({"data": e["data"], "agentes": {e["agente"]}, "uso": e["uso"]})
+        for atual, seguinte in zip(lotes, lotes[1:]):
+            if atual["uso"] is not None and seguinte["uso"] is not None and seguinte["uso"] >= atual["uso"]:
+                if len(atual["agentes"]) == 1:
+                    unico = next(iter(atual["agentes"]))
+                    deltas.setdefault(unico, []).append(seguinte["uso"] - atual["uso"])
+                else:
+                    compartilhados.update(atual["agentes"])
+
+    partes = []
+    for agente in sorted(a for a, n in contagem.items() if n >= 2):
+        ds = deltas.get(agente, [])
+        cs = custos.get(agente, [])
+        if ds:
+            pp_txt = f"{sum(ds) / len(ds):.1f} pp"
+        elif agente in compartilhados:
+            pp_txt = "indeterminado"
+        else:
+            pp_txt = "? pp"
+        custo_txt = f"{round(sum(cs) / len(cs))}" if cs else "?"
+        partes.append(f"{agente} {pp_txt} (custo médio {custo_txt})")
+    if not partes:
+        return None
+    return "Custo por despacho (aprox.): " + " · ".join(partes)
 
 
 def _falta(ate, agora):
@@ -218,6 +300,14 @@ def _medidores(provedor, agora, origem, avisos):
             or (medidor.get("id") or "").casefold() in MEDIDORES_AGY_CLAUDE
         ):
             via_claude = "Antigravity"
+        eh_codex = (
+            provedor.get("id") == "codex"
+            or nome.casefold() == "codex"
+            or (not claude_code and not antigravity and (
+                (medidor.get("id") or "").casefold() == "codex" or medidor_nome.casefold() == "codex"
+            ))
+        )
+        conta = ("Padrão" if (provedor.get("id") == "codex" or nome.casefold() == "codex") else nome) if eh_codex else None
         janelas = [_janela(j, agora) for j in (janelas_brutas or [])]
         usos = [j["usado"] for j in janelas if j["usado"] is not None]
         resets = [j["reset"] for j in janelas if j["reset"]]
@@ -247,6 +337,7 @@ def _medidores(provedor, agora, origem, avisos):
 
         yield {
             "provedor": nome, "plano": plano, "medidor": medidor_nome,
+            "conta": conta, "eh_codex": eh_codex,
             "janelas": janelas, "uso_max": uso_max, "reset_min": min(resets, default=None),
             "estado": "desconhecido" if motivos else "ready", "estado_provedor": estado,
             "origem": origem, "ultima_leitura": ultimo, "notas": provedor.get("notes") or [],
@@ -298,7 +389,7 @@ def ler_cotas():
                                   f"estado {prov.get('state') or 'ausente'}; cache lista {', '.join(pagos)}). "
                                   "Confira a conta e atualize a leitura do Maestri.")
             if all(p["estado"] == "desconhecido" and not p["veto_despacho"] for p in medidores):
-                fallback = _cotas_rollout()
+                fallback = _cotas_rollout(plano_esperado=plano or None)
                 if fallback:
                     avisos.append("Codex: leitura do Maestri suprida pelo rollout local (rate_limits)")
                     for p in fallback:
@@ -324,7 +415,7 @@ def _mtime_rollout(arquivo):
         return -1
 
 
-def _cotas_rollout():
+def _cotas_rollout(plano_esperado=None):
     sessoes = _casa_codex() / "sessions"
     try:
         arquivos = nlargest(5, sessoes.rglob("rollout-*.jsonl"), key=_mtime_rollout)
@@ -333,6 +424,9 @@ def _cotas_rollout():
     for arquivo in arquivos:
         provedor = _snapshot_codex(arquivo)
         if provedor is None:
+            continue
+        plano_rollout = (provedor.get("plan") or "").casefold()
+        if plano_esperado and plano_rollout and plano_rollout != plano_esperado.casefold():
             continue
         medidores = list(_medidores(provedor, datetime.now(timezone.utc), "codex_rollout", []))
         if medidores and all(p["estado"] == "ready" for p in medidores):
@@ -404,7 +498,13 @@ def resumo_linhas(pools, avisos):
             detalhe = " (tarefa pequena de sondagem ou confira com maestri check)"
         janelas = " · ".join(partes) or "sem janelas"
         elegivel = "sim" if p["elegivel"] else "não"
-        linhas.append(f"{p['provedor']}{plano} / {p['medidor']}: {janelas} | estado {p['estado']} | "
+        if p.get("eh_codex"):
+            cabecalho = f"Codex conta {p.get('conta') or 'Padrão'}{plano} / {p['medidor']}"
+        elif p.get("via_claude") == "Antigravity":
+            cabecalho = f"{p['provedor']}{plano} / {p['medidor']} (cota Claude/GPT do plano Gemini, não o Claude Pro)"
+        else:
+            cabecalho = f"{p['provedor']}{plano} / {p['medidor']}"
+        linhas.append(f"{cabecalho}: {janelas} | estado {p['estado']} | "
                       f"elegível: {elegivel}, {p['despacho']}{detalhe}{reserva}")
     linhas.append(linha_claude)
     def _eh_gemini(p):
@@ -446,6 +546,8 @@ def main() -> int:
     pasta = next((raiz / ".maestri" for raiz in (atual, *atual.parents)
                   if (raiz / ".maestri").is_dir()), atual / ".maestri")
     if linha := distribuicao_recente(pasta):
+        linhas.append(linha)
+    if linha := custo_por_despacho(pasta):
         linhas.append(linha)
     print("\n".join(linhas))
     return 0 if pools else 1
